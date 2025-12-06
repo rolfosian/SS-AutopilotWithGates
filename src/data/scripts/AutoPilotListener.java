@@ -71,7 +71,6 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
     public AutoPilotListener(boolean abilityActive) {
         super(false);
         this.abilityActive = abilityActive;
-        this.ability = (AutoPilotGatesAbility) Global.getSector().getPlayerFleet().getAbility("AutoPilotWithGates");
         
         if (Global.getSettings().getModManager().isModEnabled("LunaLib")) {
             this.autoJump = Global.getSettings().getBoolean("gateAutopilot_autoJump");
@@ -366,6 +365,10 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
 
     public void setAbility(AutoPilotGatesAbility ability) {
         this.ability = ability;
+    }
+
+    public AutoPilotGatesAbility getAbility() {
+        return this.ability;
     }
 
     public CustomCampaignEntityAPI getEntryGate() {

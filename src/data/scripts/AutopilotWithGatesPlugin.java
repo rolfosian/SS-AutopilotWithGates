@@ -65,7 +65,12 @@ public class AutopilotWithGatesPlugin extends BaseModPlugin {
             if (!playerFleet.hasAbility("AutoPilotWithGates")) {
                 sector.getCharacterData().addAbility("AutoPilotWithGates");
                 playerFleet.addAbility("AutoPilotWithGates");
+                listener.setAbility((AutoPilotGatesAbility) Global.getSector().getPlayerFleet().getAbility("AutoPilotWithGates"));
+
                 sector.getCampaignUI().addMessage(unlockedMessagePlugin, MessageClickAction.NOTHING);
+
+            } else if (listener.getAbility() == null) {
+                listener.setAbility((AutoPilotGatesAbility) Global.getSector().getPlayerFleet().getAbility("AutoPilotWithGates"));
             }
 
         } else {
