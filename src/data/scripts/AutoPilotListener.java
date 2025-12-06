@@ -60,7 +60,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
 
     private final boolean autoJump;
     private final boolean mapOverride;
-    private final AutoPilotGatesAbility ability;
+    private AutoPilotGatesAbility ability;
 
     // private final EnumSet<CampaignEngineLayers> layers = EnumSet.of(CampaignEngineLayers.FLEETS);
     // private final SpriteAPI arrow = Global.getSettings().getSprite("graphics/warroom/ship_arrow.png");
@@ -362,6 +362,10 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
 
         this.entryGate = null;
         this.exitGate = null;
+    }
+
+    public void setAbility(AutoPilotGatesAbility ability) {
+        this.ability = ability;
     }
 
     public CustomCampaignEntityAPI getEntryGate() {

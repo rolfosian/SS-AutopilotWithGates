@@ -83,6 +83,7 @@ public class AutopilotWithGatesPlugin extends BaseModPlugin {
                     if (GateEntityPlugin.canUseGates()) {
                         Global.getSector().getCharacterData().addAbility("AutoPilotWithGates");
                         Global.getSector().getPlayerFleet().addAbility("AutoPilotWithGates");
+                        listener.setAbility((AutoPilotGatesAbility) Global.getSector().getPlayerFleet().getAbility("AutoPilotWithGates"));
 
                         Global.getSector().getCampaignUI().addMessage(unlockedMessagePlugin, MessageClickAction.NOTHING);
 
