@@ -1,0 +1,2 @@
+name,id,type,tags,activationDays,activationCooldown,durationDays,deactivationDays,deactivationCooldown,unlockedAtStart,defaultForAIFleet,musicSuppression,uiOn,uiOff,uiLoop,worldOn,worldOff,worldLoop,icon,plugin,ai,desc,sortOrder
+Autopilot With Gates,AutoPilotWithGates,TOGGLE,stealth-,,,,,,false,false,,ui_transponder_on,ui_transponder_off,,,,,graphics/icons/missions/at_the_gates.png,data.scripts.AutoPilotGatesAbility,,"Enable gate support for autopilot course lay-in",10
