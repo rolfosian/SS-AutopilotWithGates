@@ -74,7 +74,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
         super(false);
         this.abilityActive = abilityActive;
         
-        if (Global.getSettings().getModManager().isModEnabled("LunaLib")) {
+        if (Global.getSettings().getModManager().isModEnabled("lunalib")) {
             this.autoJump = LunaSettings.getBoolean("autopilot_with_gates", "autoJump");
             this.mapOverride = LunaSettings.getBoolean("autopilot_with_gates", "mapOverride");
 

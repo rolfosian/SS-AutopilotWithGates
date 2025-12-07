@@ -37,7 +37,7 @@ public class AutopilotWithGatesPlugin extends BaseModPlugin {
 
     @Override
     public void onApplicationLoad() {
-        if (Global.getSettings().getModManager().isModEnabled("LunaLib")) {
+        if (Global.getSettings().getModManager().isModEnabled("lunalib")) {
             GateFinder.LY_DIST_TOLERANCE = Global.getSettings().getFloat("gateAutopilot_LY_DIST_TOLERANCE");
         } else {
             GateFinder.LY_DIST_TOLERANCE = Global.getSettings().getFloat("gateAutopilot_LY_DIST_TOLERANCE");
