@@ -1,0 +1,3 @@
+fieldID,fieldName,fieldType,defaultValue,secondaryValue,fieldDescription,minValue,maxValue,tab
+autoJump,Autojump,Boolean,false,,"If true, autopilot jumps automatically when reaching gates",,,
+mapOverride,Map Course Override,Boolean,true,,"If true, the autopilot course will show as the normal course in the map when opened when autopilot with gates is enabled",,,

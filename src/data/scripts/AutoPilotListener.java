@@ -34,6 +34,8 @@ import com.fs.starfarer.api.util.Misc;
 // import com.fs.starfarer.api.campaign.CampaignEngineLayers;
 // import com.fs.starfarer.combat.CombatViewport;
 
+import lunalib.lunaSettings.LunaSettings;
+
 // the commented out shit isnt worth the hassle
 
 public class AutoPilotListener extends BaseCampaignEventListener implements EveryFrameScript { //, LayeredRenderable<CampaignEngineLayers, CombatViewport> {
@@ -73,8 +75,8 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
         this.abilityActive = abilityActive;
         
         if (Global.getSettings().getModManager().isModEnabled("LunaLib")) {
-            this.autoJump = Global.getSettings().getBoolean("gateAutopilot_autoJump");
-            this.mapOverride = Global.getSettings().getBoolean("gateAutopilot_mapOverride");
+            this.autoJump = LunaSettings.getBoolean("autopilot_with_gates", "autoJump");
+            this.mapOverride = LunaSettings.getBoolean("autopilot_with_gates", "mapOverride");
 
         } else {
             this.autoJump = Global.getSettings().getBoolean("gateAutopilot_autoJump");
@@ -165,6 +167,9 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                 }
             } else {
                 Global.getSector().layInCourseFor(this.currentUltimateTarget);
+                this.entryGate = null;
+                this.exitGate = null;
+                this.currentUltimateTarget = null;
                 return;
             }
         }
