@@ -18,6 +18,7 @@ import com.fs.starfarer.api.campaign.CustomCampaignEntityAPI;
 import com.fs.starfarer.api.campaign.InteractionDialogAPI;
 import com.fs.starfarer.api.campaign.JumpPointAPI.JumpDestination;
 import com.fs.starfarer.api.campaign.LocationAPI;
+import com.fs.starfarer.api.campaign.OptionPanelAPI.OptionTooltipCreator;
 import com.fs.starfarer.api.campaign.SectorEntityToken;
 import com.fs.starfarer.api.campaign.StarSystemAPI;
 import com.fs.starfarer.api.campaign.listeners.ListenerUtil;
@@ -26,6 +27,7 @@ import com.fs.starfarer.api.campaign.rules.MemoryAPI;
 import com.fs.starfarer.api.impl.campaign.GateEntityPlugin;
 // import com.fs.starfarer.api.impl.campaign.ids.Tags;
 import com.fs.starfarer.api.impl.campaign.rulecmd.missions.GateCMD;
+import com.fs.starfarer.api.ui.TooltipMakerAPI;
 import com.fs.starfarer.api.util.IntervalUtil;
 import com.fs.starfarer.api.util.Misc;
 // import com.fs.starfarer.campaign.BaseLocation;
@@ -91,6 +93,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
         if (!this.interval.intervalElapsed()) return;
 
         CampaignUIAPI campaignUI = Global.getSector().getCampaignUI();
+        if (campaignUI.getCurrentInteractionDialog() != null) return;
 
         SectorEntityToken ultimateTarget = campaignUI.getUltimateCourseTarget();
         if (ultimateTarget == null) {
@@ -165,6 +168,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                     this.entryGate = newEntryGate;
                     Global.getSector().layInCourseFor(this.entryGate);
                 }
+                return;
             } else {
                 Global.getSector().layInCourseFor(this.currentUltimateTarget);
                 this.entryGate = null;
@@ -326,17 +330,23 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
 
                 MemoryAPI mem = new GateAutoPilotRuleMemory();
                 mem.set("jump", jump);
-
                 dialog.getPlugin().getMemoryMap().put("$gateAutoPilotRule", mem);
+
                 dialog.getOptionPanel().addOption(
                     "Travel through the gate to " + this.exitGate.getContainingLocation().getName(),
                     "gateAutoPilotRule"
                 );
-                dialog.getOptionPanel().setTooltip(
-                    "gateAutoPilotRule", 
-                    "Travel through the gate to get to ultimate autopilot course target " + this.currentUltimateTarget.getName() + " in "
-                    + this.currentUltimateTarget.getContainingLocation().getName()
-                );
+                dialog.getOptionPanel().addOptionTooltipAppender("gateAutoPilotRule", new OptionTooltipCreator() {
+                    @Override
+                    public void createTooltip(TooltipMakerAPI arg0, boolean arg1) {
+                        arg0.addParaWithMarkup("Travel through the gate to get to ultimate autopilot course target " + self.currentUltimateTarget.getName() + " in "
+                            + self.currentUltimateTarget.getContainingLocation().getName() + " at the cost of {{%s}} fuel.",
+                            0f,
+                            String.valueOf(cost)
+                        );
+                    }
+                    
+                });
                 return;
 
             } else {
