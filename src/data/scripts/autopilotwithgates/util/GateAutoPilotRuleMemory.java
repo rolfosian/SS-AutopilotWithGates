@@ -1,4 +1,4 @@
-package data.scripts;
+package data.scripts.autopilotwithgates.util;
 
 import java.util.*;
 

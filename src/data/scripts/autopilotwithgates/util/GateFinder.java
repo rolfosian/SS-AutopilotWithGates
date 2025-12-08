@@ -1,4 +1,4 @@
-package data.scripts;
+package data.scripts.autopilotwithgates.util;
 
 import org.apache.log4j.Logger;
 import org.lwjgl.util.vector.Vector2f;
@@ -12,7 +12,7 @@ import com.fs.starfarer.api.campaign.SectorEntityToken;
 import com.fs.starfarer.api.campaign.StarSystemAPI;
 import com.fs.starfarer.api.impl.campaign.GateEntityPlugin;
 import com.fs.starfarer.api.impl.campaign.ids.Tags;
-import com.fs.starfarer.api.impl.campaign.rulecmd.missions.GateCMD;
+// import com.fs.starfarer.api.impl.campaign.rulecmd.missions.GateCMD;
 import com.fs.starfarer.api.util.Misc;
 
 import java.util.*;
@@ -34,7 +34,6 @@ public class GateFinder {
         return Misc.getDistanceLY(playerFleet, target) - LY_DIST_TOLERANCE < Misc.getDistanceLY(toCheck, target);
     }
 
-    // unused
     public static int getCombinedFuelCost(
         CampaignFleetAPI playerFleet,
         SectorEntityToken entryGate,
@@ -56,11 +55,22 @@ public class GateFinder {
         return combinedFuelCost;
     }
 
+    public static float getCombinedDistLY(
+        CampaignFleetAPI playerFleet,
+        SectorEntityToken entryGate,
+        SectorEntityToken exitGate,
+        SectorEntityToken ultimateTarget
+    ) {
+        float fleetToEntryGateDist = Misc.getDistanceLY(playerFleet, entryGate);
+        float exitToUltimateTargetDist = Misc.getDistanceLY(exitGate, ultimateTarget);
+        
+        return fleetToEntryGateDist + exitToUltimateTargetDist;
+    }
+
     public static int getFuelCostToUltimateTarget(CampaignFleetAPI playerFleet, SectorEntityToken ultimateTarget) {
         return (int) (playerFleet.getLogistics().getFuelCostPerLightYear() * Misc.getDistanceLY(playerFleet, ultimateTarget));
     }
 
-    // unused
     public static boolean isPlayerFleetBetweenGates(
         CampaignFleetAPI playerFleet,
         SectorEntityToken entryGate,

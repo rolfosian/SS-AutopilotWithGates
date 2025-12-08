@@ -1,4 +1,4 @@
-package data.scripts;
+package data.scripts.autopilotwithgates;
 
 import com.fs.starfarer.api.Global;
 import com.fs.starfarer.api.impl.campaign.abilities.BaseToggleAbility;

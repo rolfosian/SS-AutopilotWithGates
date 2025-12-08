@@ -1,4 +1,4 @@
-package data.scripts;
+package data.scripts.autopilotwithgates;
 
 import java.util.Map;
 
@@ -13,6 +13,12 @@ import com.fs.starfarer.api.impl.campaign.intel.BaseIntelPlugin;
 import com.fs.starfarer.api.ui.TooltipMakerAPI;
 import com.fs.starfarer.api.util.IntervalUtil;
 import com.fs.starfarer.api.util.Misc;
+import com.fs.starfarer.campaign.BaseLocation;
+
+import data.scripts.autopilotwithgates.util.GateFinder;
+import data.scripts.autopilotwithgates.util.Refl;
+import data.scripts.autopilotwithgates.util.UiUtil;
+
 import com.fs.starfarer.api.campaign.comm.CommMessageAPI.MessageClickAction;
 import com.fs.starfarer.api.campaign.comm.IntelInfoPlugin;
 
@@ -37,6 +43,8 @@ public class AutopilotWithGatesPlugin extends BaseModPlugin {
 
     @Override
     public void onApplicationLoad() {
+        Refl.init();
+        UiUtil.init();
         if (Global.getSettings().getModManager().isModEnabled("lunalib")) {
             GateFinder.LY_DIST_TOLERANCE = Global.getSettings().getFloat("gateAutopilot_LY_DIST_TOLERANCE");
         } else {
@@ -110,21 +118,24 @@ public class AutopilotWithGatesPlugin extends BaseModPlugin {
         }
     }
 
+    private BaseLocation arrowRenderingLoc;
     @Override
     public void beforeGameSave() {
         SectorEntityToken ult = listener.getCurrentUltimateTarget();
+        if (ult != null) Global.getSector().layInCourseFor(ult);
 
-        if (ult != null) {
-            Global.getSector().layInCourseFor(ult);
-        }
+        arrowRenderingLoc = listener.getArrowRenderingLoc();
+        if (arrowRenderingLoc != null) listener.removeArrowRenderer();
     }
 
     @Override
     public void afterGameSave() {
         SectorEntityToken entry = listener.getEntryGate();
+        if (entry != null) Global.getSector().layInCourseFor(entry);
 
-        if (entry != null) {
-            Global.getSector().layInCourseFor(entry);
+        if (arrowRenderingLoc != null) {
+            listener.addArrowRenderer(arrowRenderingLoc);
+            this.arrowRenderingLoc = null;
         }
     }
 }
