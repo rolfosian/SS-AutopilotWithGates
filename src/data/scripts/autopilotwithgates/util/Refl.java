@@ -123,5 +123,23 @@ public class Refl {
         }
     }
 
+    public static Object getMethodFromSuperClass(String methodName, Class<?> cls) {
+        try {
+            Class<?> currentClass = cls;
+
+            while (currentClass != null) {
+                for (Object method : currentClass.getDeclaredMethods()) {
+                    if (getMethodNameHandle.invoke(method).equals(methodName)) {
+                        return method;
+                    }
+                }
+                currentClass = currentClass.getSuperclass();
+            }
+        } catch (Throwable e) {
+            throw new RuntimeException(e);
+        }
+        return null;
+    }
+
     public static void init() {}
 }

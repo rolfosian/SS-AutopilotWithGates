@@ -124,8 +124,8 @@ public class AutopilotWithGatesPlugin extends BaseModPlugin {
         SectorEntityToken ult = listener.getCurrentUltimateTarget();
         if (ult != null) Global.getSector().layInCourseFor(ult);
 
-        arrowRenderingLoc = listener.getArrowRenderingLoc();
-        if (arrowRenderingLoc != null) listener.removeArrowRenderer();
+        this.arrowRenderingLoc = listener.getArrowRenderingLoc();
+        if (this.arrowRenderingLoc != null) listener.removeArrowRenderer();
     }
 
     @Override
@@ -133,8 +133,8 @@ public class AutopilotWithGatesPlugin extends BaseModPlugin {
         SectorEntityToken entry = listener.getEntryGate();
         if (entry != null) Global.getSector().layInCourseFor(entry);
 
-        if (arrowRenderingLoc != null) {
-            listener.addArrowRenderer(arrowRenderingLoc);
+        if (this.arrowRenderingLoc != null) {
+            listener.addArrowRenderer(this.arrowRenderingLoc);
             this.arrowRenderingLoc = null;
         }
     }

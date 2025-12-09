@@ -55,6 +55,7 @@ public class GateFinder {
         return combinedFuelCost;
     }
 
+    // unused
     public static float getCombinedDistLY(
         CampaignFleetAPI playerFleet,
         SectorEntityToken entryGate,
@@ -71,6 +72,7 @@ public class GateFinder {
         return (int) (playerFleet.getLogistics().getFuelCostPerLightYear() * Misc.getDistanceLY(playerFleet, ultimateTarget));
     }
 
+    // unused
     public static boolean isPlayerFleetBetweenGates(
         CampaignFleetAPI playerFleet,
         SectorEntityToken entryGate,
@@ -84,12 +86,10 @@ public class GateFinder {
         Vector2f ab = Vector2f.sub(exitLoc, entryLoc, null);
         float abLenSq = ab.lengthSquared();
     
-        // protect against degenerate gate placement
         if (abLenSq == 0f) return false;
     
         float t = Vector2f.dot(ap, ab) / abLenSq;
     
-        // ensure projection lands between the gates
         if (t < 0f || t > 1f) return false;
     
         Vector2f proj = new Vector2f(
@@ -97,7 +97,6 @@ public class GateFinder {
             entryLoc.y + ab.y * t
         );
     
-        // tolerance suppresses false negatives from slight offsets
         float dist = Vector2f.sub(playerLoc, proj, null).length();
         return dist < 50f;
     }
@@ -113,6 +112,7 @@ public class GateFinder {
         return false;
     }
 
+    /** Returns null if  exit gate is nearest gate to player*/
     public static CustomCampaignEntityAPI getNearestGateToPlayerOutsideLocation(SectorEntityToken exitGate) {
         CampaignFleetAPI playerFleet = Global.getSector().getPlayerFleet();
         Vector2f hyperSpaceLoc = playerFleet.getLocationInHyperspace();
@@ -155,6 +155,7 @@ public class GateFinder {
         return getNearestGateInLocation(targetSystem, getClosestJumpPoint(targetSystem, targetGate).getLocation());
     }
 
+    /**Returns null if nearest gate is in player location or player fleet is closer to ultimate target */
     public static CustomCampaignEntityAPI getNearestGate(SectorEntityToken ultimateTarget) {
         Vector2f hyperSpaceLoc = ultimateTarget.getLocationInHyperspace();
         

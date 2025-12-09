@@ -3,14 +3,17 @@ package data.scripts.autopilotwithgates.util;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
+import java.util.List;
 
 import org.apache.log4j.Logger;
 
 import com.fs.graphics.util.Fader;
 import com.fs.starfarer.api.campaign.SectorEntityToken;
+import com.fs.starfarer.api.ui.UIComponentAPI;
 import com.fs.starfarer.api.ui.UIPanelAPI;
 import com.fs.starfarer.campaign.BaseLocation;
 import com.fs.starfarer.campaign.CampaignEngine;
+import com.fs.starfarer.campaign.comms.v2.EventsPanel;
 
 import data.scripts.autopilotwithgates.org.objectweb.asm.*;
 
@@ -25,33 +28,15 @@ public class UiUtil {
         logger.info(sb.toString());
     }
 
-    public static MethodHandle getMapHandle;
-    public static MethodHandle getLocationMapHandle;
-    public static MethodHandle isRadarModeHandle;
-    public static MethodHandle getZoomTrackerHandle;
-    public static MethodHandle getFactorHandle;
-    public static MethodHandle zoomTrackerFloatGetterHandle;
+    public static final MethodHandle mapTabGetMapHandle;
+    public static final MethodHandle getLocationMapHandle;
+    public static final MethodHandle isRadarModeHandle;
+    public static final MethodHandle getZoomTrackerHandle;
+    public static final MethodHandle getFactorHandle;
+    public static final MethodHandle zoomTrackerFloatGetterHandle;
 
-    public static void refMapHandles(Object mapTab) {
-        MethodHandles.Lookup lookup = MethodHandles.lookup();
-        try {
-            Class<?> mapTabClass = mapTab.getClass();
-            Class<?> mapClass = Refl.getReturnType(Refl.getMethod("getMap", mapTabClass));
-            Class<?> zoomTrackerClass = Refl.getReturnType(Refl.getMethod("getZoomTracker", mapClass));
-
-            getMapHandle = lookup.findVirtual(mapTabClass, "getMap", MethodType.methodType(mapClass));
-            isRadarModeHandle = lookup.findVirtual(mapClass, "isRadarMode", MethodType.methodType(boolean.class));
-            getZoomTrackerHandle = lookup.findVirtual(mapClass, "getZoomTracker", MethodType.methodType(zoomTrackerClass));
-            getFactorHandle = lookup.findVirtual(mapClass, "getFactor", MethodType.methodType(float.class));
-            getLocationMapHandle = lookup.findVirtual(mapClass, "getLocation", MethodType.methodType(BaseLocation.class));
-
-            String methodName = UiUtil.getZoomTrackerFloatGetterName(zoomTrackerClass);
-            zoomTrackerFloatGetterHandle = lookup.findVirtual(zoomTrackerClass, methodName, MethodType.methodType(float.class));
-
-        } catch (Throwable e) {
-            throw new RuntimeException(e);
-        }
-    }
+    public static final MethodHandle getEventsPanelHandle;
+    public static final MethodHandle eventsPanelGetMapHandle;
 
     public static final MethodHandle campaignEngineGetCoreHandle;
     public static final MethodHandle coreGetCurrentTabHandle;
@@ -61,10 +46,34 @@ public class UiUtil {
     public static final MethodHandle courseWidgetGetInnerHandle;
     public static final MethodHandle courseWidgetGetPhaseHandle;
 
+    public static final Class<?> mapClass;
+    public static final Class<?> uiPanelClass;
+
+    public static final MethodHandle getChildrenNonCopyHandle;
+
     static {
         MethodHandles.Lookup lookup = MethodHandles.lookup();
 
         try {
+            Class<?> mapTabClass = Refl.getReturnType(Refl.getMethod("getMap", EventsPanel.class));
+            mapClass = Refl.getReturnType(Refl.getMethod("getMap", mapTabClass));
+            mapTabGetMapHandle = lookup.findVirtual(mapTabClass, "getMap", MethodType.methodType(mapClass));
+
+            uiPanelClass = mapClass.getSuperclass();
+            getChildrenNonCopyHandle = lookup.findVirtual(uiPanelClass, "getChildrenNonCopy", MethodType.methodType(List.class));
+
+            Class<?> intelTabClass = Refl.getReturnType(Refl.getMethod("getIntelTab", EventsPanel.class));
+            getEventsPanelHandle = lookup.findVirtual(intelTabClass, "getEventsPanel", MethodType.methodType(EventsPanel.class));
+            eventsPanelGetMapHandle = lookup.findVirtual(EventsPanel.class, "getMap", MethodType.methodType(mapTabClass));
+
+            isRadarModeHandle = lookup.findVirtual(mapClass, "isRadarMode", MethodType.methodType(boolean.class));
+            getFactorHandle = lookup.findVirtual(mapClass, "getFactor", MethodType.methodType(float.class));
+            getLocationMapHandle = lookup.findVirtual(mapClass, "getLocation", MethodType.methodType(BaseLocation.class));
+
+            Class<?> zoomTrackerClass = Refl.getReturnType(Refl.getMethod("getZoomTracker", mapClass));
+            getZoomTrackerHandle = lookup.findVirtual(mapClass, "getZoomTracker", MethodType.methodType(zoomTrackerClass));
+            zoomTrackerFloatGetterHandle = lookup.findVirtual(zoomTrackerClass, getZoomTrackerFloatGetterName(zoomTrackerClass), MethodType.methodType(float.class));
+
             Class<?> campaignUIClass = null;
             for (Class<?> cls : CampaignEngine.class.getDeclaredClasses()) {
                 if (cls.isInterface()) {
@@ -89,6 +98,14 @@ public class UiUtil {
         }
     }
 
+    public static List<UIComponentAPI> getChildrenNonCopy(Object uiPanel) {
+        try {
+            return (List<UIComponentAPI>) getChildrenNonCopyHandle.invoke(uiPanel);
+        } catch (Throwable e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     public static UIPanelAPI coreGetCurrentTab(Object core) {
         try {
             return (UIPanelAPI) coreGetCurrentTabHandle.invoke(core);
@@ -97,9 +114,19 @@ public class UiUtil {
         }
     }
 
-    public static Object getCore(Object campaignUI) {
+    public static MethodHandle interactionDialogGetCoreHandle;
+    public static Object getCore(Object campaignUI, Object interactionDialog) {
         try {
-            return (Object) campaignEngineGetCoreHandle.invoke(campaignUI);
+            if (interactionDialog == null) return campaignEngineGetCoreHandle.invoke(campaignUI);
+
+            if (interactionDialogGetCoreHandle == null) {
+                Class<?> interactionDialogClass = interactionDialog.getClass();
+                Class<?> coreClass = Refl.getReturnType(Refl.getMethod("getCoreUI", interactionDialogClass));
+
+                MethodHandles.Lookup lookup = MethodHandles.lookup();
+                interactionDialogGetCoreHandle = lookup.findVirtual(interactionDialogClass, "getCoreUI", MethodType.methodType(coreClass));
+            }
+            return interactionDialogGetCoreHandle.invoke(interactionDialog);
         } catch (Throwable e) {
             throw new RuntimeException(e);
         }

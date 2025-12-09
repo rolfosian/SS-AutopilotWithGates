@@ -47,7 +47,7 @@ public class AutoPilotGatesAbility extends BaseToggleAbility {
 
          float pad = 10.0f;
 
-         tooltip.addPara("Automatically sets the autopilot course target to the nearest gate to the fleet and links to the gate nearest to the ultimate autopilot course target", pad);
+         tooltip.addPara("Automatically sets the autopilot course target to the nearest gate to the fleet and links to the gate nearest to the ultimate autopilot course target.\n\nIf the non-gate route costs less fuel than the gate route, then the default course arrow will be green. Otherwise, it will be red.", pad);
     }
 
     @Override

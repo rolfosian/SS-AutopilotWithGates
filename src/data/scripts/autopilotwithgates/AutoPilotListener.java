@@ -2,6 +2,8 @@ package data.scripts.autopilotwithgates;
 
 import java.awt.Color;
 import java.util.EnumSet;
+import java.util.HashSet;
+import java.util.Set;
 
 import org.apache.log4j.Logger;
 import org.lwjgl.opengl.GL11;
@@ -12,6 +14,7 @@ import com.fs.graphics.LayeredRenderable;
 import com.fs.starfarer.campaign.BaseLocation;
 import com.fs.starfarer.campaign.CampaignEngine;
 import com.fs.starfarer.campaign.fleet.CampaignFleet;
+import com.fs.starfarer.combat.CombatViewport;
 
 import com.fs.starfarer.api.EveryFrameScript;
 import com.fs.starfarer.api.Global;
@@ -42,15 +45,16 @@ import com.fs.starfarer.api.ui.CustomPanelAPI;
 import com.fs.starfarer.api.ui.PositionAPI;
 import com.fs.starfarer.api.ui.TooltipMakerAPI;
 import com.fs.starfarer.api.ui.UIPanelAPI;
+import com.fs.starfarer.api.ui.UIComponentAPI;
 
 // import com.fs.starfarer.api.util.IntervalUtil;
 import com.fs.starfarer.api.util.Misc;
 
-import com.fs.starfarer.combat.CombatViewport;
-
 import data.scripts.autopilotwithgates.util.GateAutoPilotRuleMemory;
 import data.scripts.autopilotwithgates.util.GateFinder;
 import data.scripts.autopilotwithgates.util.UiUtil;
+import data.scripts.autopilotwithgates.util.TreeTraverser;
+import data.scripts.autopilotwithgates.util.TreeTraverser.TreeNode;
 
 import lunalib.lunaSettings.LunaSettings;
 
@@ -64,10 +68,15 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
         }
         logger.info(sb.toString());
     }
+    private static final EnumSet<CampaignEngineLayers> layers = EnumSet.of(CampaignEngineLayers.FLEETS);
     private static final Color DARK_RED = new Color(139, 0, 0);
     private static final Color DARK_GREEN = new Color(0, 139, 0);
+    private static final SpriteAPI arrow = Global.getSettings().getSprite("graphics/warroom/ship_arrow.png");
+    private static final SpriteAPI gateCircle = Global.getSettings().getSprite("graphics/icons/gate0.png");
 
     private final AutoPilotListener self = this;
+    private AutoPilotGatesAbility ability;
+    private final boolean autoJump;
     // private IntervalUtil interval = new IntervalUtil(0.1f, 0.1f);
 
     private SectorEntityToken currentUltimateTarget;
@@ -77,16 +86,12 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
     private boolean postGateJump = false;
     private boolean abilityActive = false;
 
-    private final boolean autoJump;
-    private AutoPilotGatesAbility ability;
-
-    private final EnumSet<CampaignEngineLayers> layers = EnumSet.of(CampaignEngineLayers.FLEETS);
-    private final SpriteAPI arrow = Global.getSettings().getSprite("graphics/warroom/ship_arrow.png");
-    private final SpriteAPI gateCircle = Global.getSettings().getSprite("graphics/icons/gate0.png");
-    private Color arrowColor = DARK_RED;
     private boolean renderingArrow = false;
-    private BaseLocation arrowRenderingLoc;
     private boolean mapArrowRendering = false;
+    private BaseLocation arrowRenderingLoc;
+    private Color arrowColor = DARK_RED;
+
+    private Set<UIComponentAPI> dialogMaps = new HashSet<>();
 
     public AutoPilotListener(boolean abilityActive) {
         super(false);
@@ -107,14 +112,16 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
         // if (!this.interval.intervalElapsed()) return;
 
         CampaignUIAPI campaignUI = Global.getSector().getCampaignUI();
-        if (campaignUI.getCurrentInteractionDialog() != null || UiUtil.getCourseWidget(campaignUI) == null) return;
+        if (UiUtil.getCourseWidget(campaignUI) == null) return;
 
         SectorEntityToken ultimateTarget = campaignUI.getUltimateCourseTarget();
         if (ultimateTarget == null) {
             if (this.mapArrowRendering) {
-                this.mapTab.removeComponent(this.mapArrowPanel);
+                this.map.removeComponent(this.mapArrowPanel);
                 this.map = null;
+                this.intelTab = null;
                 this.mapTab = null;
+                this.interactionDialogMapParent = null;
                 this.mapArrowRendering = false;
             }
 
@@ -139,8 +146,9 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
             if (this.renderingArrow) removeArrowRenderer();
 
             if (this.mapArrowRendering) {
-                this.mapTab.removeComponent(this.mapArrowPanel);
+                this.map.removeComponent(this.mapArrowPanel);
                 this.map = null;
+                this.intelTab = null;
                 this.mapTab = null;
                 this.mapArrowRendering = false;
             }
@@ -151,23 +159,114 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                 > GateFinder.getFuelCostToUltimateTarget(playerFleet, this.currentUltimateTarget)) this.arrowColor = DARK_GREEN;
             else this.arrowColor = DARK_RED;
 
-            if (CoreUITabId.MAP == campaignUI.getCurrentCoreTab()) {
-                if (!this.mapArrowRendering) {
-                    this.mapArrowRendering = true;
+            CoreUITabId currentCoreTabId = campaignUI.getCurrentCoreTab();
+            InteractionDialogAPI interactionDialog = campaignUI.getCurrentInteractionDialog();
 
-                    this.mapTab = (UIPanelAPI) UiUtil.coreGetCurrentTab(UiUtil.getCore(campaignUI));
-                    if (UiUtil.getMapHandle == null) UiUtil.refMapHandles(this.mapTab);
+            if (interactionDialog != null && interactionDialog.getInteractionTarget() != self.entryGate) {
+                if (this.intelTab != null) {
+                    this.map.removeComponent(this.mapArrowPanel);
+                    this.map = null;
+                    this.intelTab = null;
+                    this.mapArrowRendering = false;
 
-                    this.map = (UIPanelAPI) getMap(this.mapTab);
-                    this.mapTab.addComponent(this.mapArrowPanel);
-                }
-            } else {
-                if (this.mapArrowRendering) {
-                    this.mapTab.removeComponent(this.mapArrowPanel);
+                } else if (this.mapTab != null) {
+                    this.map.removeComponent(this.mapArrowPanel);
                     this.map = null;
                     this.mapTab = null;
                     this.mapArrowRendering = false;
                 }
+
+                TreeTraverser trav = new TreeTraverser(interactionDialog);
+                for (TreeNode node : trav.getNodes()) {
+                    for (UIComponentAPI child : node.getChildren()) {
+                        if (child.getClass() == UiUtil.mapClass && !dialogMaps.contains(child)) {
+                            this.dialogMaps.add(child);
+                            UIPanelAPI mape = (UIPanelAPI) child;
+                            mape.addComponent(Global.getSettings().createCustom(0f, 0f, new EphemeralMapArrowRenderer(mape)));
+                        }
+                    }
+                }
+
+            } else {
+                this.dialogMaps.clear();
+            }
+            
+            if (CoreUITabId.MAP == currentCoreTabId) {
+                if (this.intelTab != null) {
+                    this.map.removeComponent(this.mapArrowPanel);
+                    this.map = null;
+                    this.intelTab = null;
+                    this.mapArrowRendering = false;
+                }
+
+                if (interactionDialog != null && this.mapArrowRendering) {
+                    this.mapTab = UiUtil.coreGetCurrentTab(UiUtil.getCore(campaignUI, interactionDialog));
+                    UIPanelAPI mape = (UIPanelAPI) getMapFromMapTab(this.mapTab);
+
+                    if (mape != this.map) {
+                        this.map.removeComponent(this.mapArrowPanel);
+                        this.map = mape;
+                        this.map.addComponent(this.mapArrowPanel);
+                    }
+                }
+
+                if (!this.mapArrowRendering) {
+                    this.mapArrowRendering = true;
+
+                    this.mapTab = UiUtil.coreGetCurrentTab(UiUtil.getCore(campaignUI, interactionDialog));
+
+                    this.map = (UIPanelAPI) getMapFromMapTab(this.mapTab);
+                    this.map.addComponent(this.mapArrowPanel);
+                }
+
+            } else if (CoreUITabId.INTEL == currentCoreTabId) {
+                if (this.mapTab != null) {
+                    this.map.removeComponent(this.mapArrowPanel);
+                    this.map = null;
+                    this.mapTab = null;
+                    this.mapArrowRendering = false;
+                }
+
+                if (interactionDialog != null && this.mapArrowRendering) {
+                    this.intelTab = UiUtil.coreGetCurrentTab(UiUtil.getCore(campaignUI, interactionDialog));
+                    UIPanelAPI mape = (UIPanelAPI) getMapFromIntelTab(this.intelTab);
+
+                    if (mape != this.map) {
+                        this.map.removeComponent(this.mapArrowPanel);
+                        this.map = mape;
+                        this.map.addComponent(this.mapArrowPanel);
+                    }
+                }
+
+                if (!this.mapArrowRendering) {
+                    this.mapArrowRendering = true;
+
+                    this.intelTab = UiUtil.coreGetCurrentTab(UiUtil.getCore(campaignUI, interactionDialog));
+                    this.map = (UIPanelAPI) getMapFromIntelTab(this.intelTab);
+                    this.map.addComponent(this.mapArrowPanel);
+
+                } else {
+                    UIPanelAPI intTab = UiUtil.coreGetCurrentTab(UiUtil.getCore(campaignUI, interactionDialog));
+                    if (intTab != this.intelTab) {
+                        this.intelTab = intTab;
+                        this.map.removeComponent(this.mapArrowPanel);
+                        this.map = (UIPanelAPI) getMapFromIntelTab(this.intelTab);
+                        this.map.addComponent(this.mapArrowPanel);
+                    }
+                }
+
+            } else if (this.interactionDialogMapParent != null && interactionDialog == null) {
+                this.map.removeComponent(this.mapArrowPanel);
+                this.map = null;
+                this.interactionDialogMapParent = null;
+                this.mapArrowRendering = false;
+
+            } else if (this.mapArrowRendering) {
+                this.map.removeComponent(this.mapArrowPanel);
+                this.map = null;
+                this.mapTab = null;
+                this.intelTab = null;
+                this.mapArrowRendering = false;
             }
             
             if (!playerFleet.isInHyperspace()) return;
@@ -344,14 +443,14 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                 dialog.getPlugin().getMemoryMap().put("$gateAutoPilotRule", mem);
 
                 dialog.getOptionPanel().addOption(
-                    "Travel through the gate to " + this.exitGate.getContainingLocation().getName(),
+                    "Travel through the gate to " + exit.getContainingLocation().getName(),
                     "gateAutoPilotRule"
                 );
                 dialog.getOptionPanel().addOptionTooltipAppender("gateAutoPilotRule", new OptionTooltipCreator() {
                     @Override
                     public void createTooltip(TooltipMakerAPI arg0, boolean arg1) {
-                        arg0.addParaWithMarkup("Travel through the gate to get to ultimate autopilot course target " + self.currentUltimateTarget.getName() + " in "
-                            + self.currentUltimateTarget.getContainingLocation().getName() + " at the cost of {{%s}} fuel.",
+                        arg0.addParaWithMarkup("Travel through the gate to get to ultimate autopilot course target " + ultimateTarget.getName() + " in "
+                            + ultimateTarget.getContainingLocation().getName() + " at the cost of {{%s}} fuel.",
                             0f,
                             String.valueOf(cost)
                         );
@@ -360,8 +459,9 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                 return;
 
             } else {
+                CustomCampaignEntityAPI exit = this.exitGate;
                 dialog.getOptionPanel().addOption(
-                    "Travel through the gate to " + this.exitGate.getContainingLocation().getName(),
+                    "Travel through the gate to " + exit.getContainingLocation().getName(),
                     "gateAutoPilotRule"
                 );
                 dialog.getOptionPanel().setTooltip("gateAutoPilotRule", "Not enough fuel to make the jump.");
@@ -384,9 +484,10 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
         removeArrowRenderer();
 
         if (this.mapArrowRendering) {
-            this.mapTab.removeComponent(this.mapArrowPanel);
+            this.map.removeComponent(this.mapArrowPanel);
             this.map = null;
             this.mapTab = null;
+            this.intelTab = null;
             this.mapArrowRendering = false;
         }
 
@@ -493,7 +594,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
 
     @Override
     public EnumSet<CampaignEngineLayers> getActiveLayers() {
-        return this.layers;
+        return layers;
     }
 
     @Override
@@ -574,9 +675,19 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                 : 0.0F;
     }
 
-    private Object getMap(Object mapTab) {
+    private Object getMapFromIntelTab(Object intelTab) {
         try {
-            return UiUtil.getMapHandle.invoke(mapTab);
+            Object eventsPanel = UiUtil.getEventsPanelHandle.invoke(intelTab);
+            Object outerMap = UiUtil.eventsPanelGetMapHandle.invoke(eventsPanel);
+            return UiUtil.mapTabGetMapHandle.invoke(outerMap);
+        } catch (Throwable e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private Object getMapFromMapTab(Object mapTab) {
+        try {
+            return UiUtil.mapTabGetMapHandle.invoke(mapTab);
         } catch (Throwable e) {
             throw new RuntimeException(e);
         }
@@ -588,12 +699,14 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
         } catch (Throwable e) {
             throw new RuntimeException(e);
         }
-        
     }
 
     private UIPanelAPI mapTab;
+    private UIPanelAPI intelTab;
+    private UIPanelAPI interactionDialogMapParent;
     private UIPanelAPI map;
-    private final BaseCustomUIPanelPlugin mapArrowRenderer = new BaseCustomUIPanelPlugin() {
+
+    private class MapArrowRenderer extends BaseCustomUIPanelPlugin {
         private float mapArrowPulseValue;
 
         @Override
@@ -604,17 +717,21 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                 if (!((boolean)UiUtil.isRadarModeHandle.invoke(self.map))) {
                     Object courseWidget = UiUtil.getCourseWidget(Global.getSector().getCampaignUI());
                     SectorEntityToken var4 = UiUtil.getNextStep(courseWidget, self.currentUltimateTarget);
+                    if (var4 == null) return;
 
                     Vector2f var5 = CampaignEngine.getInstance().getPlayerFleet().getLocation();
                     Vector2f var6 = var4.getLocation();
 
                     BaseLocation mapLoc = getLocation(map);
                     if (mapLoc != var4.getContainingLocation()) {
-                        if (mapLoc == null || !mapLoc.isHyperspace()) {
+                        LocationAPI campaignMapLocation = CampaignEngine.getInstance().getUIData().getCampaignMapLocation();
+                        if (mapLoc == null || (!mapLoc.isHyperspace() ||
+                            (self.intelTab == null && campaignMapLocation != null && !campaignMapLocation.isHyperspace()))) {
                            return;
                         }
 
-                        if (self.currentUltimateTarget.isInHyperspace() && !var4.isInHyperspace()) var4 = self.currentUltimateTarget;
+                        // if (self.currentUltimateTarget.isInHyperspace() && !var4.isInHyperspace()) var4 = self.currentUltimateTarget;
+                        var4 = self.currentUltimateTarget;
 
                         var5 = CampaignEngine.getInstance().getPlayerFleet().getLocationInHyperspace();
                         var6 = var4.getLocationInHyperspace();
@@ -655,17 +772,19 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                     Vector2f var16 = CampaignEngine.getInstance().getPlayerFleet().getLocation();
                     Vector2f var17 = var4.getLocation();
                     
+                    LocationAPI campaignMapLocation = CampaignEngine.getInstance().getUIData().getCampaignMapLocation();
                     BaseLocation mapLoc = getLocation(map);
                     if (mapLoc != var4.getContainingLocation()) {
-                        if (mapLoc == null || !mapLoc.isHyperspace()) {
+                        if (mapLoc == null || (!mapLoc.isHyperspace() ||
+                            (self.intelTab == null && campaignMapLocation != null && !campaignMapLocation.isHyperspace()))) {
                             return;
                         }
 
-                        if (self.currentUltimateTarget.isInHyperspace() && !var4.isInHyperspace()) var4 = self.currentUltimateTarget;
+                        var4 = self.currentUltimateTarget;
    
                         var16 = CampaignEngine.getInstance().getPlayerFleet().getLocationInHyperspace();
                         var17 = var4.getLocationInHyperspace();
-                     }
+                    }
   
                     float var7 = distanceBetween(var16, var17);
                     if (!(var7 < 1000.0F)) {
@@ -691,7 +810,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                         float var15 = var17.y * factor;
                         alphaMult *= 0.5F;
 
-                        PositionAPI mapPos = map.getPosition();
+                        PositionAPI mapPos = self.map.getPosition();
 
                         GL11.glPushMatrix();
                         GL11.glTranslatef((int) mapPos.getCenterX(), (int) mapPos.getCenterY(), 0.0f);
@@ -705,10 +824,11 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                             var9,
                             self.arrowColor,
                             alphaMult,
-                            self.arrow
+                            arrow
                         );
 
-                        if (mapLoc.isHyperspace()) {
+                        if ((campaignMapLocation != null && campaignMapLocation.isHyperspace())
+                            || mapLoc.isHyperspace()) {
                             var16 = self.entryGate.getLocationInHyperspace();
                             var17 = self.exitGate.getLocationInHyperspace();
 
@@ -741,16 +861,13 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                                     var9,
                                     var11,
                                     alphaMult,
-                                    self.gateCircle
+                                    gateCircle
                                 );
                             }
 
-                            if (self.currentUltimateTarget.isInHyperspace() && self.currentUltimateTarget instanceof JumpPointAPI
-                            && ((JumpPointAPI)self.currentUltimateTarget).getDestinationStarSystem() == self.exitGate.getContainingLocation()) {
-                                GL11.glPopMatrix();
-                                return;
-
-                            } else if (self.currentUltimateTarget.getContainingLocation() == self.exitGate.getContainingLocation()) {
+                            if ((self.currentUltimateTarget.isInHyperspace() && self.currentUltimateTarget instanceof JumpPointAPI
+                            && ((JumpPointAPI)self.currentUltimateTarget).getDestinationStarSystem() == self.exitGate.getContainingLocation())
+                            || self.currentUltimateTarget.getContainingLocation() == self.exitGate.getContainingLocation()) {
                                 GL11.glPopMatrix();
                                 return;
                             }
@@ -785,7 +902,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                                     var9,
                                     var11,
                                     alphaMult,
-                                    self.arrow
+                                    arrow
                                 );
                             }
                         }
@@ -796,8 +913,8 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                 throw new RuntimeException(e);
             }
         }
-    };
-    private final CustomPanelAPI mapArrowPanel = Global.getSettings().createCustom(0f, 0f, this.mapArrowRenderer);
+    }
+    private final CustomPanelAPI mapArrowPanel = Global.getSettings().createCustom(0f, 0f, new MapArrowRenderer());
 
     private void renderCourseArrowOnMap(float var0, float var1, float var2, float var3, float var4, float var5, float var6, Color var7, float var8, SpriteAPI arrow) {
         arrow.setSize(var5, var5);
@@ -835,6 +952,214 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
     
             arrow.setAlphaMult(var8 * var23);
             arrow.renderAtCenter(var21, var22);
+        }
+    }
+
+    private class EphemeralMapArrowRenderer extends BaseCustomUIPanelPlugin {
+        private float mapArrowPulseValue;
+        private final UIPanelAPI map;
+
+        public EphemeralMapArrowRenderer(UIPanelAPI map) {
+            this.map = map;
+        }
+
+        @Override
+        public void advance(float deltaTime) {
+            if (self.entryGate == null) return;
+
+            try {
+                if (!((boolean)UiUtil.isRadarModeHandle.invoke(this.map))) {
+                    Object courseWidget = UiUtil.getCourseWidget(Global.getSector().getCampaignUI());
+                    SectorEntityToken var4 = UiUtil.getNextStep(courseWidget, self.currentUltimateTarget);
+                    if (var4 == null) return;
+
+                    Vector2f var5 = CampaignEngine.getInstance().getPlayerFleet().getLocation();
+                    Vector2f var6 = var4.getLocation();
+
+                    BaseLocation mapLoc = getLocation(map);
+                    if (mapLoc != var4.getContainingLocation()) {
+                        if (mapLoc == null || !mapLoc.isHyperspace()) {
+                           return;
+                        }
+
+                        var4 = self.currentUltimateTarget;
+
+                        var5 = CampaignEngine.getInstance().getPlayerFleet().getLocationInHyperspace();
+                        var6 = var4.getLocationInHyperspace();
+                    }
+
+                    float var7 = distanceBetween(var5, var6);
+                    if (var7 < 1000.0F) {
+                        var7 = 1000.0F;
+                    }
+
+                    for(this.mapArrowPulseValue += deltaTime * 0.1F * 10000.0F / var7; this.mapArrowPulseValue > 1.0F; --this.mapArrowPulseValue) {
+                    }
+                }
+            } catch (Throwable e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        @Override
+        public void render(float alphaMult) {
+            if (self.entryGate == null) return;
+
+            try {
+                if (!((boolean)UiUtil.isRadarModeHandle.invoke(this.map))) {
+                    Object courseWidget = UiUtil.getCourseWidget(Global.getSector().getCampaignUI());
+                    SectorEntityToken var4 = UiUtil.getNextStep(courseWidget, self.currentUltimateTarget);
+                    
+                    if (var4.isInHyperspace() && var4 instanceof JumpPointAPI) {
+                        JumpPointAPI var5 = (JumpPointAPI)var4;
+                        if (!var5.getDestinations().isEmpty()) {
+                            SectorEntityToken var6 = ((JumpPointAPI.JumpDestination)var5.getDestinations().get(0)).getDestination();
+                            if (var6 != null && var6.getStarSystem() != null) {
+                                var4 = var6.getStarSystem().getHyperspaceAnchor();
+                            }
+                        }
+                    }
+
+                    Vector2f var16 = CampaignEngine.getInstance().getPlayerFleet().getLocation();
+                    Vector2f var17 = var4.getLocation();
+                    
+                    BaseLocation mapLoc = getLocation(map);
+                    if (mapLoc != var4.getContainingLocation()) {
+                        if (mapLoc == null || !mapLoc.isHyperspace()) {
+                            return;
+                        }
+
+                        var4 = self.currentUltimateTarget;
+   
+                        var16 = CampaignEngine.getInstance().getPlayerFleet().getLocationInHyperspace();
+                        var17 = var4.getLocationInHyperspace();
+                     }
+  
+                    float var7 = distanceBetween(var16, var17);
+                    if (!(var7 < 1000.0F)) {
+                        float var8 = 10.0F;
+                        float var9 = 3.0F;
+                        float var10 = (float) UiUtil.zoomTrackerFloatGetterHandle.invoke(UiUtil.getZoomTrackerHandle.invoke(this.map));
+                        if (var10 < 0.75F) {
+                            var10 = 0.75F;
+                        }
+    
+                        var8 /= var10;
+                        var9 /= var10;
+                        if (var8 < 7.0F) {
+                            var8 = 7.0F;
+                            var9 = 2.1F;
+                        }
+
+
+                        float factor = (float) UiUtil.getFactorHandle.invoke(this.map);
+                        float var12 = var16.x * factor;
+                        float var13 = var16.y * factor;
+                        float var14 = var17.x * factor;
+                        float var15 = var17.y * factor;
+                        alphaMult *= 0.5F;
+
+                        PositionAPI mapPos = this.map.getPosition();
+
+                        GL11.glPushMatrix();
+                        GL11.glTranslatef((int) mapPos.getCenterX(), (int) mapPos.getCenterY(), 0.0f);
+                        renderCourseArrowOnMap(
+                            var12,
+                            var13,
+                            var14,
+                            var15,
+                            this.mapArrowPulseValue,
+                            var8,
+                            var9,
+                            self.arrowColor,
+                            alphaMult,
+                            arrow
+                        );
+                        
+                        if (mapLoc.isHyperspace()) {
+                            var16 = self.entryGate.getLocationInHyperspace();
+                            var17 = self.exitGate.getLocationInHyperspace();
+
+                            Color var11 = Misc.getBasePlayerColor();
+
+                            var7 = distanceBetween(var16, var17);
+                            if (!(var7 < 1000.0F)) {
+                                var8 = 10.0F;
+                                var9 = 3.0F;
+                                    
+                                var8 /= var10;
+                                var9 /= var10;
+                                if (var8 < 7.0F) {
+                                    var8 = 7.0F;
+                                    var9 = 2.1F;
+                                }
+                                
+                                var12 = var16.x * factor;
+                                var13 = var16.y * factor;
+                                var14 = var17.x * factor;
+                                var15 = var17.y * factor;
+            
+                                renderCourseArrowOnMap(
+                                    var12,
+                                    var13,
+                                    var14,
+                                    var15,
+                                    this.mapArrowPulseValue,
+                                    var8,
+                                    var9,
+                                    var11,
+                                    alphaMult,
+                                    gateCircle
+                                );
+                            }
+
+                            if ((self.currentUltimateTarget.isInHyperspace() && self.currentUltimateTarget instanceof JumpPointAPI
+                            && ((JumpPointAPI)self.currentUltimateTarget).getDestinationStarSystem() == self.exitGate.getContainingLocation())
+                            || self.currentUltimateTarget.getContainingLocation() == self.exitGate.getContainingLocation()) {
+                                GL11.glPopMatrix();
+                                return;
+                            }
+
+                            var16 = self.exitGate.getLocationInHyperspace();
+                            var17 = self.currentUltimateTarget.getLocationInHyperspace();
+
+                            var7 = distanceBetween(var16, var17);
+                            if (!(var7 < 1000.0F)) {
+                                var8 = 10.0F;
+                                var9 = 3.0F;
+                                    
+                                var8 /= var10;
+                                var9 /= var10;
+                                if (var8 < 7.0F) {
+                                    var8 = 7.0F;
+                                    var9 = 2.1F;
+                                }
+                                
+                                var12 = var16.x * factor;
+                                var13 = var16.y * factor;
+                                var14 = var17.x * factor;
+                                var15 = var17.y * factor;
+                                
+                                renderCourseArrowOnMap(
+                                    var12,
+                                    var13,
+                                    var14,
+                                    var15,
+                                    this.mapArrowPulseValue,
+                                    var8,
+                                    var9,
+                                    var11,
+                                    alphaMult,
+                                    arrow
+                                );
+                            }
+                        }
+                        GL11.glPopMatrix();
+                    }
+                }
+            } catch (Throwable e) {
+                throw new RuntimeException(e);
+            }
         }
     }
 }
