@@ -11,17 +11,27 @@ public class Refl {
     private static final MethodHandle getConstructorParameterTypesHandle;
     private static final MethodHandle constructorNewInstanceHandle;
     private static final MethodHandle invokeMethodHandle;
+    private static final MethodHandle setMethodAccessible;
+
+    private static final MethodHandle getFieldNameHandle;
+    private static final MethodHandle getFieldTypeHandle;
 
     static {
         try {
             MethodHandles.Lookup lookup = MethodHandles.lookup();
+
             Class<?> methodClass = Class.forName("java.lang.reflect.Method", false, Class.class.getClassLoader());
             Class<?> constructorClass = Class.forName("java.lang.reflect.Constructor", false, Class.class.getClassLoader());
+            Class<?> fieldClass = Class.forName("java.lang.reflect.Field", false, Class.class.getClassLoader());
+
+            getFieldNameHandle = lookup.findVirtual(fieldClass, "getName", MethodType.methodType(String.class));
+            getFieldTypeHandle = lookup.findVirtual(fieldClass, "getType", MethodType.methodType(Class.class));
 
             getMethodNameHandle = lookup.findVirtual(methodClass, "getName", MethodType.methodType(String.class));
             getParameterTypesHandle = lookup.findVirtual(methodClass, "getParameterTypes", MethodType.methodType(Class[].class));
             getReturnTypeHandle = lookup.findVirtual(methodClass, "getReturnType", MethodType.methodType(Class.class));
             invokeMethodHandle = lookup.findVirtual(methodClass, "invoke", MethodType.methodType(Object.class, Object.class, Object[].class));
+            setMethodAccessible = lookup.findVirtual(methodClass, "setAccessible", MethodType.methodType(void.class, boolean.class));
 
             constructorNewInstanceHandle = lookup.findVirtual(constructorClass, "newInstance", MethodType.methodType(Object.class, Object[].class));
             getConstructorParameterTypesHandle = lookup.findVirtual(constructorClass, "getParameterTypes", MethodType.methodType(Class[].class));
@@ -29,6 +39,27 @@ public class Refl {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+    }
+
+    public static Class<?> getFieldType(Object field) {
+        try {
+            return (Class<?>) getFieldTypeHandle.invoke(field);
+        } catch (Throwable e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static Object getFieldByName(String name, Class<?> cls) {
+        try {
+            for (Object field : cls.getDeclaredFields()) {
+                if (((String)getFieldNameHandle.invoke(field)).equals(name)) {
+                    return field;
+                }
+            }
+        } catch (Throwable e) {
+            throw new RuntimeException(e);
+        }
+        return null;
     }
 
     public static Class<?> getReturnType(Object method) {
@@ -93,12 +124,40 @@ public class Refl {
         return null;
     }
 
+    public static Object getMethodDeclared(String methodName, Class<?> cls) {
+        for (Object method : cls.getDeclaredMethods()) {
+            try {
+                if (((String)getMethodNameHandle.invoke(method)).equals(methodName)) {
+                    return method;
+                }
+            } catch (Throwable e) {
+                throw new RuntimeException(e);
+            }
+        }
+        return null;
+    }
+
+    public static Object invokePrivateMethodDirectly(Object method, Object instance, Object... arguments) {
+        try {
+            setMethodAccessible.invoke(method, true);
+            return invokeMethodHandle.invoke(method, instance, arguments);
+        } catch (Throwable e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     public static Object invokeMethodDirectly(Object method, Object instance, Object... arguments) {
         try {
             return invokeMethodHandle.invoke(method, instance, arguments);
         } catch (Throwable e) {
             throw new RuntimeException(e);
         }
+    }
+
+    public static Object getMethodDeclaredAndInvokeDirectly(String methodName, Object instance, Object... arguments) {
+        Object method = getMethodDeclared(methodName, instance.getClass());
+        if (method == null) return null;
+        return invokePrivateMethodDirectly(method, instance, arguments);
     }
 
     public static Object getMethodAndInvokeDirectly(String methodName, Object instance, Object... arguments) {

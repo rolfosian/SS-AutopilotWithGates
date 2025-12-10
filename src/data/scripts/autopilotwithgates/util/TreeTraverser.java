@@ -112,7 +112,7 @@ public class TreeTraverser {
     }
 
     private void getChildren(UIComponentAPI parent, int depth) {
-        List<UIComponentAPI> children = UiUtil.uiPanelClass.isInstance(parent) ?  UiUtil.getChildrenNonCopy(parent) : null;
+        List<UIComponentAPI> children = UiUtil.uiPanelClass.isInstance(parent) ?  UiUtil.utils.getChildrenNonCopy(parent) : null;
 
         if (children != null && !children.isEmpty()) {
             this.nodes.add(new TreeNode((UIPanelAPI)parent, children, depth));
@@ -126,7 +126,7 @@ public class TreeTraverser {
     }
 
     private void getChildren(UIComponentAPI parent, Map<UIPanelAPI, List<UIComponentAPI>> treeMap, int depth) {
-        List<UIComponentAPI> children = UiUtil.uiPanelClass.isInstance(parent) ? UiUtil.getChildrenNonCopy(parent) : null;
+        List<UIComponentAPI> children = UiUtil.uiPanelClass.isInstance(parent) ? UiUtil.utils.getChildrenNonCopy(parent) : null;
 
         if (children != null && !children.isEmpty()) {
             this.nodes.add(new TreeNode((UIPanelAPI)parent, children, depth));
@@ -142,7 +142,7 @@ public class TreeTraverser {
 
 
     private void getChildren(UIComponentAPI parent, int depth, int depthLimit) {
-        List<UIComponentAPI> children = UiUtil.uiPanelClass.isInstance(parent) ? UiUtil.getChildrenNonCopy(parent) : null;
+        List<UIComponentAPI> children = UiUtil.uiPanelClass.isInstance(parent) ? UiUtil.utils.getChildrenNonCopy(parent) : null;
 
         if (children != null && !children.isEmpty()) {
             this.nodes.add(new TreeNode((UIPanelAPI)parent, children, depth));
@@ -157,7 +157,7 @@ public class TreeTraverser {
     }
 
     private void getChildren(UIComponentAPI parent, int depth, int... treePath) {
-        List<UIComponentAPI> children = UiUtil.uiPanelClass.isInstance(parent) ? UiUtil.getChildrenNonCopy(parent) : null;
+        List<UIComponentAPI> children = UiUtil.uiPanelClass.isInstance(parent) ? UiUtil.utils.getChildrenNonCopy(parent) : null;
 
         if (children != null && !children.isEmpty()) {
             this.nodes.add(new TreeNode((UIPanelAPI)parent, children, depth));

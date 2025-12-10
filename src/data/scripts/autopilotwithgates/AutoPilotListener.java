@@ -13,6 +13,7 @@ import com.fs.graphics.LayeredRenderable;
 
 import com.fs.starfarer.campaign.BaseLocation;
 import com.fs.starfarer.campaign.CampaignEngine;
+import com.fs.starfarer.campaign.comms.v2.EventsPanel;
 import com.fs.starfarer.campaign.fleet.CampaignFleet;
 import com.fs.starfarer.combat.CombatViewport;
 
@@ -119,7 +120,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
         // if (!this.interval.intervalElapsed()) return;
 
         CampaignUIAPI campaignUI = Global.getSector().getCampaignUI();
-        if (UiUtil.getCourseWidget(campaignUI) == null) return;
+        if (UiUtil.utils.getCourseWidget(campaignUI) == null) return;
 
         SectorEntityToken ultimateTarget = campaignUI.getUltimateCourseTarget();
         if (ultimateTarget == null) {
@@ -212,8 +213,8 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
             
             if (CoreUITabId.MAP == currentCoreTabId) {
                 if (interactionDialog != null && this.mapTabMap != null) {
-                    this.mapTab = UiUtil.coreGetCurrentTab(UiUtil.getCore(campaignUI, interactionDialog));
-                    UIPanelAPI mape = (UIPanelAPI) getMapFromMapTab(this.mapTab);
+                    this.mapTab = (UIPanelAPI) UiUtil.utils.coreGetCurrentTab(UiUtil.getCore(campaignUI, interactionDialog));
+                    UIPanelAPI mape = (UIPanelAPI) UiUtil.utils.mapTabGetMap(this.mapTab);
 
                     if (mape != this.mapTabMap) {
                         this.mapTabMap.removeComponent(this.mapTabMapArrowPanel);
@@ -229,15 +230,15 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                 }
 
                 if (this.mapTabMap == null && dialogMapsIsEmpty) {
-                    this.mapTab = UiUtil.coreGetCurrentTab(UiUtil.getCore(campaignUI, interactionDialog));
+                    this.mapTab = (UIPanelAPI) UiUtil.utils.coreGetCurrentTab(UiUtil.getCore(campaignUI, interactionDialog));
 
-                    this.mapTabMap = (UIPanelAPI) getMapFromMapTab(this.mapTab);
+                    this.mapTabMap = (UIPanelAPI) UiUtil.utils.mapTabGetMap(this.mapTab);
                     this.mapTabMap.addComponent(this.mapTabMapArrowPanel);
                 }
 
             } else if (CoreUITabId.INTEL == currentCoreTabId) {
                 if (interactionDialog != null && this.intelTabMap != null) {
-                    this.intelTab = UiUtil.coreGetCurrentTab(UiUtil.getCore(campaignUI, interactionDialog));
+                    this.intelTab = (UIPanelAPI) UiUtil.utils.coreGetCurrentTab(UiUtil.getCore(campaignUI, interactionDialog));
                     UIPanelAPI mape = (UIPanelAPI) getMapFromIntelTab(this.intelTab);
 
                     if (mape != this.intelTabMap) {
@@ -254,13 +255,13 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                 }
 
                 if (this.intelTabMap == null && dialogMapsIsEmpty) {
-                    this.intelTab = UiUtil.coreGetCurrentTab(UiUtil.getCore(campaignUI, interactionDialog));
+                    this.intelTab = (UIPanelAPI) UiUtil.utils.coreGetCurrentTab(UiUtil.getCore(campaignUI, interactionDialog));
 
                     this.intelTabMap = (UIPanelAPI) getMapFromIntelTab(this.intelTab);
                     this.intelTabMap.addComponent(this.intelTabMapArrowPanel);
 
                 } else if (this.intelTabMap != null) {
-                    UIPanelAPI intTab = UiUtil.coreGetCurrentTab(UiUtil.getCore(campaignUI, interactionDialog));
+                    UIPanelAPI intTab = (UIPanelAPI) UiUtil.utils.coreGetCurrentTab(UiUtil.getCore(campaignUI, interactionDialog));
                     if (intTab != this.intelTab) {
                         this.intelTab = intTab;
 
@@ -542,72 +543,78 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
 
     private void renderCourseArrow() {
         CampaignFleet playerFleet = (CampaignFleet) Global.getSector().getPlayerFleet();
-        float var1 = Global.getSector().getViewport().getAlphaMult();
-        var1 *= playerFleet.getSensorFader().getBrightness();
+        float alphaMult = Global.getSector().getViewport().getAlphaMult();
+        alphaMult *= playerFleet.getSensorFader().getBrightness();
 
-        if (!(var1 <= 0.0F)) {
+        if (!(alphaMult <= 0.0F)) {
             GL11.glPushMatrix();
 
             Vector2f fleetLoc = playerFleet.getLocation();
             GL11.glTranslatef(fleetLoc.x, fleetLoc.y, 0.0f);
-            var1 *= playerFleet.getSensorContactFaderBrightness();
+            alphaMult *= playerFleet.getSensorContactFaderBrightness();
 
-            if (var1 <= 0.0f) {
+            if (alphaMult <= 0.0f) {
                 GL11.glPopMatrix();
                 return;
             }
 
-            Object courseWidget = UiUtil.getCourseWidget(Global.getSector().getCampaignUI());
+            Object courseWidget = UiUtil.utils.getCourseWidget(Global.getSector().getCampaignUI());
 
-            SectorEntityToken var4 = UiUtil.getNextStep(courseWidget, this.currentUltimateTarget);
+            SectorEntityToken nextStep = UiUtil.utils.getNextStep(courseWidget, this.currentUltimateTarget);
             
-            if (var4 == null) {
+            if (nextStep == null) {
                 GL11.glPopMatrix();
                 return;
             }
-            var1 *= UiUtil.courseWidgetGetInner(courseWidget).getBrightness();
+            alphaMult *= UiUtil.utils.getInner(courseWidget).getBrightness();
 
-            float var5 = 10.0F;
-            float var6 = Global.getSector().getCampaignUI().getZoomFactor();
-            var5 *= var6;
+            float arrowSize = 10.0F;
+            float zoomFactor = Global.getSector().getCampaignUI().getZoomFactor();
+            arrowSize *= zoomFactor;
 
-            arrow.setSize(var5, var5);
+            arrow.setSize(arrowSize, arrowSize);
             arrow.setColor(arrowColor);
-            arrow.setAlphaMult(var1);
-            float var7 = angleBetween(Global.getSector().getPlayerFleet().getLocation(), var4.getLocation());
-            arrow.setAngle(var7 - 90.0F);
-            float var8 = (float)Math.cos(Math.toRadians((double)var7));
-            float var9 = (float)Math.sin(Math.toRadians((double)var7));
-            float var10 = 3.0F;
-            float var11 = 15.0F;
-            float var12 = (var5 + var10) * var11;
-            float var13 = Math.max(0.0F, distanceBetween(fleetLoc, var4.getLocation()) - var12 - 50.0F);
-            float var14;
-            if (var12 > var13) {
-                var14 = var13 / var12;
-                var1 *= var14;
+            arrow.setAlphaMult(alphaMult);
+
+            float angle = angleBetween(Global.getSector().getPlayerFleet().getLocation(), nextStep.getLocation());
+            arrow.setAngle(angle - 90.0F);
+
+            float cosAngle = (float)Math.cos(Math.toRadians((double)angle));
+            float sinAngle = (float)Math.sin(Math.toRadians((double)angle));
+
+            float arrowSpacing = 3.0F;
+            float numArrows = 15.0F;
+
+            float totalArrowPathLength = (arrowSize + arrowSpacing) * numArrows;
+            float remainingDistance = Math.max(0.0F, distanceBetween(fleetLoc, nextStep.getLocation()) - totalArrowPathLength - 50.0F);
+
+            float fadeFactor;
+            if (totalArrowPathLength > remainingDistance) {
+                fadeFactor = remainingDistance / totalArrowPathLength;
+                alphaMult *= fadeFactor;
             }
 
-            var14 = 0.1F;
-            float var15 = 0.25F;
+            float fadeStartDistance = 0.1F;
+            float fadeEndDistance = 0.25F;
 
-            for(float var16 = 0.0F; var16 < var11; ++var16) {
-                float var17;
-                for(var17 = UiUtil.courseWidgetGetPhase(courseWidget) + var16 * (1.0F / var11); var17 > 1.0F; --var17) {
+            for(float arrowIndex = 0.0F; arrowIndex < numArrows; ++arrowIndex) {
+                float phase;
+                for(phase = UiUtil.utils.getPhase(courseWidget) + arrowIndex * (1.0F / numArrows); phase > 1.0F; --phase) {
                 }
 
-                float var18 = 1.0F;
-                if (var17 < var14) {
-                    var18 = var17 / var14;
-                } else if (var17 > 1.0F - var15) {
-                    var18 = (1.0F - var17) / var15;
+                float arrowAlpha = 1.0F;
+                if (phase < fadeStartDistance) {
+                    arrowAlpha = phase / fadeStartDistance;
+                } else if (phase > 1.0F - fadeEndDistance) {
+                    arrowAlpha = (1.0F - phase) / fadeEndDistance;
                 }
 
-                float var19 = playerFleet.getSelectionSize() + 5.0F + var5 + var17 * var12;
-                float var20 = var19 * var8;
-                float var21 = var19 * var9;
-                arrow.setAlphaMult(var1 * var18);
-                arrow.renderAtCenter(var20, var21);
+                float distanceFromFleet = playerFleet.getSelectionSize() + 5.0F + arrowSize + phase * totalArrowPathLength;
+                float arrowX = distanceFromFleet * cosAngle;
+                float arrowY = distanceFromFleet * sinAngle;
+
+                arrow.setAlphaMult(alphaMult * arrowAlpha);
+                arrow.renderAtCenter(arrowX, arrowY);
             }
             GL11.glPopMatrix();
         }
@@ -637,89 +644,18 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
         }
     }
 
-    private static float distanceBetween(Vector2f var0, Vector2f var1) {
-        return (float)Math.sqrt((double)((var0.x - var1.x) * (var0.x - var1.x) + (var0.y - var1.y) * (var0.y - var1.y)));
-    }
-
-    private static final int TABLE_SIZE = (int)Math.sqrt(1048576.0);
-    private static final float INV_TABLE_RANGE;
-    private static final float[] ATAN2_LOOKUP;
-    
-    static {
-        INV_TABLE_RANGE = 1.0F / (float)(TABLE_SIZE - 1);
-        ATAN2_LOOKUP = new float[1048576];
-    
-        for (int var0 = 0; var0 < TABLE_SIZE; ++var0) {
-            for (int var1 = 0; var1 < TABLE_SIZE; ++var1) {
-                float var2 = (float)var0 / (float)TABLE_SIZE;
-                float var3 = (float)var1 / (float)TABLE_SIZE;
-                ATAN2_LOOKUP[var1 * TABLE_SIZE + var0] = (float)Math.atan2((double)var3, (double)var2);
-            }
-        }
+    private static float distanceBetween(Vector2f pos1, Vector2f pos2) {
+        return (float)Math.sqrt((double)((pos1.x - pos2.x) * (pos1.x - pos2.x) + (pos1.y - pos2.y) * (pos1.y - pos2.y)));
     }
     
-    private static float angleBetween(Vector2f var0, Vector2f var1) {
-        return fastAtan2(var1.y - var0.y, var1.x - var0.x) * 57.295784F;
-    }
-    
-    private static final float fastAtan2(float var0, float var1) {
-        float var2;
-        float var3;
-    
-        if (var1 < 0.0F) {
-            if (var0 < 0.0F) {
-                var1 = -var1;
-                var0 = -var0;
-                var3 = 1.0F;
-            } else {
-                var1 = -var1;
-                var3 = -1.0F;
-            }
-            var2 = -3.1415927F;
-        } else {
-            if (var0 < 0.0F) {
-                var0 = -var0;
-                var3 = -1.0F;
-            } else {
-                var3 = 1.0F;
-            }
-            var2 = 0.0F;
-        }
-    
-        float var4 = 1.0F / ((var1 < var0 ? var0 : var1) * INV_TABLE_RANGE);
-        int var5 = (int)(var1 * var4);
-        int var6 = (int)(var0 * var4);
-        int var7 = var6 * TABLE_SIZE + var5;
-    
-        return var7 >= 0 && var7 < ATAN2_LOOKUP.length
-                ? (ATAN2_LOOKUP[var7] + var2) * var3
-                : 0.0F;
+    private static float angleBetween(Vector2f pos1, Vector2f pos2) {
+        return UiUtil.fastAtan2(pos2.y - pos1.y, pos2.x - pos1.x) * 57.295784F;
     }
 
     private Object getMapFromIntelTab(Object intelTab) {
-        try {
-            Object eventsPanel = UiUtil.getEventsPanelHandle.invoke(intelTab);
-            Object outerMap = UiUtil.eventsPanelGetMapHandle.invoke(eventsPanel);
-            return UiUtil.mapTabGetMapHandle.invoke(outerMap);
-        } catch (Throwable e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    private Object getMapFromMapTab(Object mapTab) {
-        try {
-            return UiUtil.mapTabGetMapHandle.invoke(mapTab);
-        } catch (Throwable e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    private BaseLocation getLocation(Object map) {
-        try {
-            return (BaseLocation) UiUtil.getLocationMapHandle.invoke(map);
-        } catch (Throwable e) {
-            throw new RuntimeException(e);
-        }
+        EventsPanel eventsPanel = UiUtil.utils.getEventsPanel(intelTab);
+        Object outerMap = UiUtil.utils.eventsPanelGetMap(eventsPanel);
+        return UiUtil.utils.mapTabGetMap(outerMap);
     }
 
     private UIPanelAPI mapTab;
@@ -742,35 +678,35 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
             UIPanelAPI mape = this.mapGetter.get();
 
             try {
-                if (!((boolean)UiUtil.isRadarModeHandle.invoke(mape))) {
-                    Object courseWidget = UiUtil.getCourseWidget(Global.getSector().getCampaignUI());
-                    SectorEntityToken var4 = UiUtil.getNextStep(courseWidget, self.currentUltimateTarget);
-                    if (var4 == null) return;
+                if (!UiUtil.utils.isRadarMode(mape)) {
+                    Object courseWidget = UiUtil.utils.getCourseWidget(Global.getSector().getCampaignUI());
+                    SectorEntityToken nextStep = UiUtil.utils.getNextStep(courseWidget, self.currentUltimateTarget);
+                    if (nextStep == null) return;
 
-                    Vector2f var5 = CampaignEngine.getInstance().getPlayerFleet().getLocation();
-                    Vector2f var6 = var4.getLocation();
+                    Vector2f playerLocation = CampaignEngine.getInstance().getPlayerFleet().getLocation();
+                    Vector2f targetLocation = nextStep.getLocation();
 
-                    BaseLocation mapLoc = getLocation(mape);
-                    if (mapLoc != var4.getContainingLocation()) {
+                    BaseLocation mapLoc = UiUtil.utils.mapGetLocation(mape);
+                    if (mapLoc != nextStep.getContainingLocation()) {
                         LocationAPI campaignMapLocation = CampaignEngine.getInstance().getUIData().getCampaignMapLocation();
                         if (mapLoc == null || (!mapLoc.isHyperspace() ||
                             (self.intelTab == null && campaignMapLocation != null && !campaignMapLocation.isHyperspace()))) {
                            return;
                         }
 
-                        // if (self.currentUltimateTarget.isInHyperspace() && !var4.isInHyperspace()) var4 = self.currentUltimateTarget;
-                        var4 = self.currentUltimateTarget;
+                        // if (self.currentUltimateTarget.isInHyperspace() && !nextStep.isInHyperspace()) nextStep = self.currentUltimateTarget;
+                        nextStep = self.currentUltimateTarget;
 
-                        var5 = CampaignEngine.getInstance().getPlayerFleet().getLocationInHyperspace();
-                        var6 = var4.getLocationInHyperspace();
+                        playerLocation = CampaignEngine.getInstance().getPlayerFleet().getLocationInHyperspace();
+                        targetLocation = nextStep.getLocationInHyperspace();
                     }
 
-                    float var7 = distanceBetween(var5, var6);
-                    if (var7 < 1000.0F) {
-                        var7 = 1000.0F;
+                    float distance = distanceBetween(playerLocation, targetLocation);
+                    if (distance < 1000.0F) {
+                        distance = 1000.0F;
                     }
 
-                    for(this.mapArrowPulseValue += deltaTime * 0.1F * 10000.0F / var7; this.mapArrowPulseValue > 1.0F; --this.mapArrowPulseValue) {
+                    for(this.mapArrowPulseValue += deltaTime * 0.1F * 10000.0F / distance; this.mapArrowPulseValue > 1.0F; --this.mapArrowPulseValue) {
                     }
                 }
             } catch (Throwable e) {
@@ -784,58 +720,63 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
             UIPanelAPI mape = this.mapGetter.get();
 
             try {
-                if (!((boolean)UiUtil.isRadarModeHandle.invoke(mape))) {
-                    Object courseWidget = UiUtil.getCourseWidget(Global.getSector().getCampaignUI());
-                    SectorEntityToken var4 = UiUtil.getNextStep(courseWidget, self.currentUltimateTarget);
+                if (!UiUtil.utils.isRadarMode(mape)) {
+                    Object courseWidget = UiUtil.utils.getCourseWidget(Global.getSector().getCampaignUI());
+                    SectorEntityToken nextStep = UiUtil.utils.getNextStep(courseWidget, self.currentUltimateTarget);
                     
-                    if (var4.isInHyperspace() && var4 instanceof JumpPointAPI) {
-                        JumpPointAPI var5 = (JumpPointAPI)var4;
-                        if (!var5.getDestinations().isEmpty()) {
-                            SectorEntityToken var6 = ((JumpPointAPI.JumpDestination)var5.getDestinations().get(0)).getDestination();
-                            if (var6 != null && var6.getStarSystem() != null) {
-                                var4 = var6.getStarSystem().getHyperspaceAnchor();
+                    if (nextStep.isInHyperspace() && nextStep instanceof JumpPointAPI) {
+                        JumpPointAPI jumpPoint = (JumpPointAPI)nextStep;
+                        if (!jumpPoint.getDestinations().isEmpty()) {
+                            SectorEntityToken destination = ((JumpPointAPI.JumpDestination)jumpPoint.getDestinations().get(0)).getDestination();
+                            if (destination != null && destination.getStarSystem() != null) {
+                                nextStep = destination.getStarSystem().getHyperspaceAnchor();
                             }
                         }
                     }
 
-                    Vector2f var16 = CampaignEngine.getInstance().getPlayerFleet().getLocation();
-                    Vector2f var17 = var4.getLocation();
+                    Vector2f playerLocation = CampaignEngine.getInstance().getPlayerFleet().getLocation();
+                    Vector2f targetLocation = nextStep.getLocation();
                     
                     LocationAPI campaignMapLocation = CampaignEngine.getInstance().getUIData().getCampaignMapLocation();
-                    BaseLocation mapLoc = getLocation(mape);
-                    if (mapLoc != var4.getContainingLocation()) {
+                    BaseLocation mapLoc = UiUtil.utils.mapGetLocation(mape);
+                    if (mapLoc != nextStep.getContainingLocation()) {
                         if (mapLoc == null || (!mapLoc.isHyperspace() ||
                             (self.intelTab == null && campaignMapLocation != null && !campaignMapLocation.isHyperspace()))) {
                             return;
                         }
 
-                        var4 = self.currentUltimateTarget;
+                        nextStep = self.currentUltimateTarget;
    
-                        var16 = CampaignEngine.getInstance().getPlayerFleet().getLocationInHyperspace();
-                        var17 = var4.getLocationInHyperspace();
+                        playerLocation = CampaignEngine.getInstance().getPlayerFleet().getLocationInHyperspace();
+                        targetLocation = nextStep.getLocationInHyperspace();
                     }
   
-                    float var7 = distanceBetween(var16, var17);
-                    if (!(var7 < 1000.0F)) {
-                        float var8 = 10.0F;
-                        float var9 = 3.0F;
-                        float var10 = (float) UiUtil.zoomTrackerFloatGetterHandle.invoke(UiUtil.getZoomTrackerHandle.invoke(mape));
-                        if (var10 < 0.75F) {
-                            var10 = 0.75F;
+                    float distance = distanceBetween(playerLocation, targetLocation);
+                    if (!(distance < 1000.0F)) {
+                        float arrowSize = 10.0F;
+                        float arrowSpacing = 3.0F;
+
+                        float zoomLevel = UiUtil.utils.getZoomLevel(UiUtil.utils.getZoomTracker(mape));
+                        if (zoomLevel < 0.75F) {
+                            zoomLevel = 0.75F;
                         }
     
-                        var8 /= var10;
-                        var9 /= var10;
-                        if (var8 < 7.0F) {
-                            var8 = 7.0F;
-                            var9 = 2.1F;
+                        arrowSize /= zoomLevel;
+                        arrowSpacing /= zoomLevel;
+
+                        if (arrowSize < 7.0F) {
+                            arrowSize = 7.0F;
+                            arrowSpacing = 2.1F;
                         }
 
-                        float factor = (float) UiUtil.getFactorHandle.invoke(mape);
-                        float var12 = var16.x * factor;
-                        float var13 = var16.y * factor;
-                        float var14 = var17.x * factor;
-                        float var15 = var17.y * factor;
+                        float factor = UiUtil.utils.getFactor(mape);
+
+                        float scaledStartX = playerLocation.x * factor;
+                        float scaledStartY = playerLocation.y * factor;
+
+                        float scaledEndX = targetLocation.x * factor;
+                        float scaledEndY = targetLocation.y * factor;
+
                         alphaMult *= 0.5F;
 
                         PositionAPI mapPos = mape.getPosition();
@@ -843,13 +784,13 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                         GL11.glPushMatrix();
                         GL11.glTranslatef((int) mapPos.getCenterX(), (int) mapPos.getCenterY(), 0.0f);
                         renderCourseArrowOnMap(
-                            var12,
-                            var13,
-                            var14,
-                            var15,
+                            scaledStartX,
+                            scaledStartY,
+                            scaledEndX,
+                            scaledEndY,
                             this.mapArrowPulseValue,
-                            var8,
-                            var9,
+                            arrowSize,
+                            arrowSpacing,
                             self.arrowColor,
                             alphaMult,
                             arrow
@@ -857,37 +798,39 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
 
                         if ((campaignMapLocation != null && campaignMapLocation.isHyperspace())
                             || mapLoc.isHyperspace()) {
-                            var16 = self.entryGate.getLocationInHyperspace();
-                            var17 = self.exitGate.getLocationInHyperspace();
+                            playerLocation = self.entryGate.getLocationInHyperspace();
+                            targetLocation = self.exitGate.getLocationInHyperspace();
 
-                            Color var11 = Misc.getBasePlayerColor();
+                            Color gateArrowColor = Misc.getBasePlayerColor();
 
-                            var7 = distanceBetween(var16, var17);
-                            if (!(var7 < 1000.0F)) {
-                                var8 = 10.0F;
-                                var9 = 3.0F;
+                            distance = distanceBetween(playerLocation, targetLocation);
+                            if (!(distance < 1000.0F)) {
+                                arrowSize = 10.0F;
+                                arrowSpacing = 3.0F;
                                 
-                                var8 /= var10;
-                                var9 /= var10;
-                                if (var8 < 7.0F) {
-                                    var8 = 7.0F;
-                                    var9 = 2.1F;
+                                arrowSize /= zoomLevel;
+                                arrowSpacing /= zoomLevel;
+
+                                if (arrowSize < 7.0F) {
+                                    arrowSize = 7.0F;
+                                    arrowSpacing = 2.1F;
                                 }
                                 
-                                var12 = var16.x * factor;
-                                var13 = var16.y * factor;
-                                var14 = var17.x * factor;
-                                var15 = var17.y * factor;
+                                scaledStartX = playerLocation.x * factor;
+                                scaledStartY = playerLocation.y * factor;
+                                
+                                scaledEndX = targetLocation.x * factor;
+                                scaledEndY = targetLocation.y * factor;
             
                                 renderCourseArrowOnMap(
-                                    var12,
-                                    var13,
-                                    var14,
-                                    var15,
+                                    scaledStartX,
+                                    scaledStartY,
+                                    scaledEndX,
+                                    scaledEndY,
                                     this.mapArrowPulseValue,
-                                    var8,
-                                    var9,
-                                    var11,
+                                    arrowSize,
+                                    arrowSpacing,
+                                    gateArrowColor,
                                     alphaMult,
                                     gateCircle
                                 );
@@ -900,35 +843,37 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                                 return;
                             }
 
-                            var16 = self.exitGate.getLocationInHyperspace();
-                            var17 = self.currentUltimateTarget.getLocationInHyperspace();
+                            playerLocation = self.exitGate.getLocationInHyperspace();
+                            targetLocation = self.currentUltimateTarget.getLocationInHyperspace();
 
-                            var7 = distanceBetween(var16, var17);
-                            if (!(var7 < 1000.0F)) {
-                                var8 = 10.0F;
-                                var9 = 3.0F;
+                            distance = distanceBetween(playerLocation, targetLocation);
+                            if (!(distance < 1000.0F)) {
+                                arrowSize = 10.0F;
+                                arrowSpacing = 3.0F;
                                     
-                                var8 /= var10;
-                                var9 /= var10;
-                                if (var8 < 7.0F) {
-                                    var8 = 7.0F;
-                                    var9 = 2.1F;
+                                arrowSize /= zoomLevel;
+                                arrowSpacing /= zoomLevel;
+
+                                if (arrowSize < 7.0F) {
+                                    arrowSize = 7.0F;
+                                    arrowSpacing = 2.1F;
                                 }
                                 
-                                var12 = var16.x * factor;
-                                var13 = var16.y * factor;
-                                var14 = var17.x * factor;
-                                var15 = var17.y * factor;
+                                scaledStartX = playerLocation.x * factor;
+                                scaledStartY = playerLocation.y * factor;
+
+                                scaledEndX = targetLocation.x * factor;
+                                scaledEndY = targetLocation.y * factor;
                                 
                                 renderCourseArrowOnMap(
-                                    var12,
-                                    var13,
-                                    var14,
-                                    var15,
+                                    scaledStartX,
+                                    scaledStartY,
+                                    scaledEndX,
+                                    scaledEndY,
                                     this.mapArrowPulseValue,
-                                    var8,
-                                    var9,
-                                    var11,
+                                    arrowSize,
+                                    arrowSpacing,
+                                    gateArrowColor,
                                     alphaMult,
                                     arrow
                                 );
@@ -962,42 +907,51 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
         public UIPanelAPI get();
     }
 
-    private void renderCourseArrowOnMap(float var0, float var1, float var2, float var3, float var4, float var5, float var6, Color var7, float var8, SpriteAPI arrow) {
-        arrow.setSize(var5, var5);
-        arrow.setColor(var7);
-        arrow.setAlphaMult(var8);
-        Vector2f var9 = new Vector2f(var0, var1);
-        Vector2f var10 = new Vector2f(var2, var3);
-        float var11 = angleBetween(var9, var10);
-        arrow.setAngle(var11 - 90.0F);
-        float var12 = (float)Math.cos(Math.toRadians((double)var11));
-        float var13 = (float)Math.sin(Math.toRadians((double)var11));
-        float var14 = distanceBetween(var9, var10);
-        float var15 = (float)((int)(var14 / (var5 + var6)));
-        float var16 = var5 * 4.0F;
-        float var17 = var16;
+    private void renderCourseArrowOnMap(float startX, float startY, float endX, float endY, float pulseValue, float arrowSize, float arrowSpacing, Color arrowColor, float alphaMult, SpriteAPI arrow) {
+        arrow.setSize(arrowSize, arrowSize);
+        arrow.setColor(arrowColor);
+        arrow.setAlphaMult(alphaMult);
+
+        Vector2f startPos = new Vector2f(startX, startY);
+        Vector2f endPos = new Vector2f(endX, endY);
+
+        float angle = angleBetween(startPos, endPos);
+        arrow.setAngle(angle - 90.0F);
+
+        float cosAngle = (float)Math.cos(Math.toRadians((double)angle));
+        float sinAngle = (float)Math.sin(Math.toRadians((double)angle));
+
+        float distance = distanceBetween(startPos, endPos);
+
+        float numArrows = (float)((int)(distance / (arrowSize + arrowSpacing)));
+
+        float fadeStartDistance = arrowSize * 4.0F;
+        float fadeEndDistance = fadeStartDistance;
         
-        for(float var18 = 0.0F; var18 < var15; ++var18) {
-            float var19;
-            for(var19 = var4 + var18 * (1.0F / var15); var19 > 1.0F; --var19) {
+        for(float arrowIndex = 0.0F; arrowIndex < numArrows; ++arrowIndex) {
+            float phase;
+            for(phase = pulseValue + arrowIndex * (1.0F / numArrows); phase > 1.0F; --phase) {
             }
     
-            float var20 = 5.0F + var5 + var19 * var14;
-            float var21 = var0 + var20 * var12;
-            float var22 = var1 + var20 * var13;
-            float var23 = 1.0F;
-            float var24 = var5 + var19 * var14;
-            if (var24 < var16) {
-                var23 = var24 / var16;
-            } else if (var24 > var14 - var17) {
-                var23 = 1.0F - (var24 - (var14 - var17)) / var17;
-                if (var23 < 0.0F) {
-                    var23 = 0.0F;
+            float distanceAlongPath = 5.0F + arrowSize + phase * distance;
+            
+            float arrowX = startX + distanceAlongPath * cosAngle;
+            float arrowY = startY + distanceAlongPath * sinAngle;
+
+            float arrowAlpha = 1.0F;
+            float currentDistance = arrowSize + phase * distance;
+
+            if (currentDistance < fadeStartDistance) {
+                arrowAlpha = currentDistance / fadeStartDistance;
+            } else if (currentDistance > distance - fadeEndDistance) {
+                arrowAlpha = 1.0F - (currentDistance - (distance - fadeEndDistance)) / fadeEndDistance;
+                if (arrowAlpha < 0.0F) {
+                    arrowAlpha = 0.0F;
                 }
             }
     
-            arrow.setAlphaMult(var8 * var23);
-            arrow.renderAtCenter(var21, var22);
+            arrow.setAlphaMult(alphaMult * arrowAlpha);
+            arrow.renderAtCenter(arrowX, arrowY);
         }
     }
 
@@ -1014,33 +968,33 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
             if (self.entryGate == null) return;
 
             try {
-                if (!((boolean)UiUtil.isRadarModeHandle.invoke(this.map))) {
-                    Object courseWidget = UiUtil.getCourseWidget(Global.getSector().getCampaignUI());
-                    SectorEntityToken var4 = UiUtil.getNextStep(courseWidget, self.currentUltimateTarget);
-                    if (var4 == null) return;
+                if (!UiUtil.utils.isRadarMode(this.map)) {
+                    Object courseWidget = UiUtil.utils.getCourseWidget(Global.getSector().getCampaignUI());
+                    SectorEntityToken nextStep = UiUtil.utils.getNextStep(courseWidget, self.currentUltimateTarget);
+                    if (nextStep == null) return;
 
-                    Vector2f var5 = CampaignEngine.getInstance().getPlayerFleet().getLocation();
-                    Vector2f var6 = var4.getLocation();
+                    Vector2f playerLocation = CampaignEngine.getInstance().getPlayerFleet().getLocation();
+                    Vector2f targetLocation = nextStep.getLocation();
 
-                    BaseLocation mapLoc = getLocation(map);
-                    if (mapLoc != var4.getContainingLocation()) {
+                    BaseLocation mapLoc = UiUtil.utils.mapGetLocation(map);
+                    if (mapLoc != nextStep.getContainingLocation()) {
                         if (mapLoc == null || !mapLoc.isHyperspace()) {
                            return;
                         }
 
-                        // if (self.currentUltimateTarget.isInHyperspace() && !var4.isInHyperspace()) var4 = self.currentUltimateTarget;
-                        var4 = self.currentUltimateTarget;
+                        // if (self.currentUltimateTarget.isInHyperspace() && !nextStep.isInHyperspace()) nextStep = self.currentUltimateTarget;
+                        nextStep = self.currentUltimateTarget;
 
-                        var5 = CampaignEngine.getInstance().getPlayerFleet().getLocationInHyperspace();
-                        var6 = var4.getLocationInHyperspace();
+                        playerLocation = CampaignEngine.getInstance().getPlayerFleet().getLocationInHyperspace();
+                        targetLocation = nextStep.getLocationInHyperspace();
                     }
 
-                    float var7 = distanceBetween(var5, var6);
-                    if (var7 < 1000.0F) {
-                        var7 = 1000.0F;
+                    float distance = distanceBetween(playerLocation, targetLocation);
+                    if (distance < 1000.0F) {
+                        distance = 1000.0F;
                     }
 
-                    for(this.mapArrowPulseValue += deltaTime * 0.1F * 10000.0F / var7; this.mapArrowPulseValue > 1.0F; --this.mapArrowPulseValue) {
+                    for(this.mapArrowPulseValue += deltaTime * 0.1F * 10000.0F / distance; this.mapArrowPulseValue > 1.0F; --this.mapArrowPulseValue) {
                     }
                 }
             } catch (Throwable e) {
@@ -1053,58 +1007,61 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
             if (self.entryGate == null) return;
 
             try {
-                if (!((boolean)UiUtil.isRadarModeHandle.invoke(this.map))) {
-                    Object courseWidget = UiUtil.getCourseWidget(Global.getSector().getCampaignUI());
-                    SectorEntityToken var4 = UiUtil.getNextStep(courseWidget, self.currentUltimateTarget);
+                if (!UiUtil.utils.isRadarMode((this.map))) {
+                    Object courseWidget = UiUtil.utils.getCourseWidget(Global.getSector().getCampaignUI());
+                    SectorEntityToken nextStep = UiUtil.utils.getNextStep(courseWidget, self.currentUltimateTarget);
                     
-                    if (var4.isInHyperspace() && var4 instanceof JumpPointAPI) {
-                        JumpPointAPI var5 = (JumpPointAPI)var4;
-                        if (!var5.getDestinations().isEmpty()) {
-                            SectorEntityToken var6 = ((JumpPointAPI.JumpDestination)var5.getDestinations().get(0)).getDestination();
-                            if (var6 != null && var6.getStarSystem() != null) {
-                                var4 = var6.getStarSystem().getHyperspaceAnchor();
+                    if (nextStep.isInHyperspace() && nextStep instanceof JumpPointAPI) {
+                        JumpPointAPI jumpPoint = (JumpPointAPI)nextStep;
+                        if (!jumpPoint.getDestinations().isEmpty()) {
+                            SectorEntityToken destination = ((JumpPointAPI.JumpDestination)jumpPoint.getDestinations().get(0)).getDestination();
+                            if (destination != null && destination.getStarSystem() != null) {
+                                nextStep = destination.getStarSystem().getHyperspaceAnchor();
                             }
                         }
                     }
 
-                    Vector2f var16 = CampaignEngine.getInstance().getPlayerFleet().getLocation();
-                    Vector2f var17 = var4.getLocation();
+                    Vector2f playerLocation = CampaignEngine.getInstance().getPlayerFleet().getLocation();
+                    Vector2f targetLocation = nextStep.getLocation();
                     
-                    BaseLocation mapLoc = getLocation(map);
-                    if (mapLoc != var4.getContainingLocation()) {
+                    BaseLocation mapLoc = UiUtil.utils.mapGetLocation(map);
+                    if (mapLoc != nextStep.getContainingLocation()) {
                         if (mapLoc == null || !mapLoc.isHyperspace()) {
                             return;
                         }
 
-                        // if (self.currentUltimateTarget.isInHyperspace() && !var4.isInHyperspace()) var4 = self.currentUltimateTarget;
-                        var4 = self.currentUltimateTarget;
+                        // if (self.currentUltimateTarget.isInHyperspace() && !nextStep.isInHyperspace()) nextStep = self.currentUltimateTarget;
+                        nextStep = self.currentUltimateTarget;
    
-                        var16 = CampaignEngine.getInstance().getPlayerFleet().getLocationInHyperspace();
-                        var17 = var4.getLocationInHyperspace();
+                        playerLocation = CampaignEngine.getInstance().getPlayerFleet().getLocationInHyperspace();
+                        targetLocation = nextStep.getLocationInHyperspace();
                      }
   
-                    float var7 = distanceBetween(var16, var17);
-                    if (!(var7 < 1000.0F)) {
-                        float var8 = 10.0F;
-                        float var9 = 3.0F;
-                        float var10 = (float) UiUtil.zoomTrackerFloatGetterHandle.invoke(UiUtil.getZoomTrackerHandle.invoke(this.map));
-                        if (var10 < 0.75F) {
-                            var10 = 0.75F;
+                    float distance = distanceBetween(playerLocation, targetLocation);
+                    if (!(distance < 1000.0F)) {
+                        float arrowSize = 10.0F;
+                        float arrowSpacing = 3.0F;
+                        float zoomLevel = UiUtil.utils.getZoomLevel(UiUtil.utils.getZoomTracker(this.map));
+                        if (zoomLevel < 0.75F) {
+                            zoomLevel = 0.75F;
                         }
     
-                        var8 /= var10;
-                        var9 /= var10;
-                        if (var8 < 7.0F) {
-                            var8 = 7.0F;
-                            var9 = 2.1F;
+                        arrowSize /= zoomLevel;
+                        arrowSpacing /= zoomLevel;
+
+                        if (arrowSize < 7.0F) {
+                            arrowSize = 7.0F;
+                            arrowSpacing = 2.1F;
                         }
 
 
-                        float factor = (float) UiUtil.getFactorHandle.invoke(this.map);
-                        float var12 = var16.x * factor;
-                        float var13 = var16.y * factor;
-                        float var14 = var17.x * factor;
-                        float var15 = var17.y * factor;
+                        float factor = UiUtil.utils.getFactor(this.map);
+
+                        float scaledStartX = playerLocation.x * factor;
+                        float scaledStartY = playerLocation.y * factor;
+
+                        float scaledEndX = targetLocation.x * factor;
+                        float scaledEndY = targetLocation.y * factor;
                         alphaMult *= 0.5F;
 
                         PositionAPI mapPos = this.map.getPosition();
@@ -1112,50 +1069,52 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                         GL11.glPushMatrix();
                         GL11.glTranslatef((int) mapPos.getCenterX(), (int) mapPos.getCenterY(), 0.0f);
                         renderCourseArrowOnMap(
-                            var12,
-                            var13,
-                            var14,
-                            var15,
+                            scaledStartX,
+                            scaledStartY,
+                            scaledEndX,
+                            scaledEndY,
                             this.mapArrowPulseValue,
-                            var8,
-                            var9,
+                            arrowSize,
+                            arrowSpacing,
                             self.arrowColor,
                             alphaMult,
                             arrow
                         );
                         
                         if (mapLoc.isHyperspace()) {
-                            var16 = self.entryGate.getLocationInHyperspace();
-                            var17 = self.exitGate.getLocationInHyperspace();
+                            playerLocation = self.entryGate.getLocationInHyperspace();
+                            targetLocation = self.exitGate.getLocationInHyperspace();
 
-                            Color var11 = Misc.getBasePlayerColor();
+                            Color gateArrowColor = Misc.getBasePlayerColor();
 
-                            var7 = distanceBetween(var16, var17);
-                            if (!(var7 < 1000.0F)) {
-                                var8 = 10.0F;
-                                var9 = 3.0F;
+                            distance = distanceBetween(playerLocation, targetLocation);
+                            if (!(distance < 1000.0F)) {
+                                arrowSize = 10.0F;
+                                arrowSpacing = 3.0F;
                                     
-                                var8 /= var10;
-                                var9 /= var10;
-                                if (var8 < 7.0F) {
-                                    var8 = 7.0F;
-                                    var9 = 2.1F;
+                                arrowSize /= zoomLevel;
+                                arrowSpacing /= zoomLevel;
+
+                                if (arrowSize < 7.0F) {
+                                    arrowSize = 7.0F;
+                                    arrowSpacing = 2.1F;
                                 }
                                 
-                                var12 = var16.x * factor;
-                                var13 = var16.y * factor;
-                                var14 = var17.x * factor;
-                                var15 = var17.y * factor;
+                                scaledStartX = playerLocation.x * factor;
+                                scaledStartY = playerLocation.y * factor;
+
+                                scaledEndX = targetLocation.x * factor;
+                                scaledEndY = targetLocation.y * factor;
             
                                 renderCourseArrowOnMap(
-                                    var12,
-                                    var13,
-                                    var14,
-                                    var15,
+                                    scaledStartX,
+                                    scaledStartY,
+                                    scaledEndX,
+                                    scaledEndY,
                                     this.mapArrowPulseValue,
-                                    var8,
-                                    var9,
-                                    var11,
+                                    arrowSize,
+                                    arrowSpacing,
+                                    gateArrowColor,
                                     alphaMult,
                                     gateCircle
                                 );
@@ -1168,35 +1127,37 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                                 return;
                             }
 
-                            var16 = self.exitGate.getLocationInHyperspace();
-                            var17 = self.currentUltimateTarget.getLocationInHyperspace();
+                            playerLocation = self.exitGate.getLocationInHyperspace();
+                            targetLocation = self.currentUltimateTarget.getLocationInHyperspace();
 
-                            var7 = distanceBetween(var16, var17);
-                            if (!(var7 < 1000.0F)) {
-                                var8 = 10.0F;
-                                var9 = 3.0F;
+                            distance = distanceBetween(playerLocation, targetLocation);
+                            if (!(distance < 1000.0F)) {
+                                arrowSize = 10.0F;
+                                arrowSpacing = 3.0F;
                                     
-                                var8 /= var10;
-                                var9 /= var10;
-                                if (var8 < 7.0F) {
-                                    var8 = 7.0F;
-                                    var9 = 2.1F;
+                                arrowSize /= zoomLevel;
+                                arrowSpacing /= zoomLevel;
+
+                                if (arrowSize < 7.0F) {
+                                    arrowSize = 7.0F;
+                                    arrowSpacing = 2.1F;
                                 }
                                 
-                                var12 = var16.x * factor;
-                                var13 = var16.y * factor;
-                                var14 = var17.x * factor;
-                                var15 = var17.y * factor;
+                                scaledStartX = playerLocation.x * factor;
+                                scaledStartY = playerLocation.y * factor;
+
+                                scaledEndX = targetLocation.x * factor;
+                                scaledEndY = targetLocation.y * factor;
                                 
                                 renderCourseArrowOnMap(
-                                    var12,
-                                    var13,
-                                    var14,
-                                    var15,
+                                    scaledStartX,
+                                    scaledStartY,
+                                    scaledEndX,
+                                    scaledEndY,
                                     this.mapArrowPulseValue,
-                                    var8,
-                                    var9,
-                                    var11,
+                                    arrowSize,
+                                    arrowSpacing,
+                                    gateArrowColor,
                                     alphaMult,
                                     arrow
                                 );
