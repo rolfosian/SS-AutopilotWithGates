@@ -286,7 +286,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
             }
             
             if (!playerFleet.isInHyperspace()) return;
-            CustomCampaignEntityAPI newEntryGate = GateFinder.getNearestGateToPlayerOutsideLocation(this.exitGate);
+            CustomCampaignEntityAPI newEntryGate = GateFinder.getNearestGateToPlayerOutsideLocation(this.exitGate, this.currentUltimateTarget);
 
             if (newEntryGate != null) {
                 if (this.entryGate != newEntryGate) {
@@ -322,7 +322,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
             }
         }
         this.exitGate = GateFinder.getNearestGate(ultimateTarget);
-        this.entryGate = GateFinder.getNearestGateToPlayerOutsideLocation(this.exitGate);
+        this.entryGate = GateFinder.getNearestGateToPlayerOutsideLocation(this.exitGate, this.currentUltimateTarget);
 
         if (this.entryGate != null && this.exitGate != null) {
             Global.getSector().layInCourseFor(this.entryGate);

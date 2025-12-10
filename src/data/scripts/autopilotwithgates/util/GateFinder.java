@@ -112,9 +112,11 @@ public class GateFinder {
         return false;
     }
 
-    /** Returns null if  exit gate is nearest gate to player*/
-    public static CustomCampaignEntityAPI getNearestGateToPlayerOutsideLocation(SectorEntityToken exitGate) {
+    /** Returns null if  exit gate is nearest gate to player or player is nearer to ultimate target*/
+    public static CustomCampaignEntityAPI getNearestGateToPlayerOutsideLocation(SectorEntityToken exitGate, SectorEntityToken ultimateTarget) {
         CampaignFleetAPI playerFleet = Global.getSector().getPlayerFleet();
+        if (ultimateTarget == null || exitGate == null || Misc.getDistanceLY(playerFleet, ultimateTarget) < Misc.getDistanceLY(playerFleet, exitGate)) return null;
+
         Vector2f hyperSpaceLoc = playerFleet.getLocationInHyperspace();
         
         StarSystemAPI targetSystem = null;
