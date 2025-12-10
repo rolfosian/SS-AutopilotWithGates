@@ -91,6 +91,23 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
     private BaseLocation arrowRenderingLoc;
     private Color arrowColor = DARK_RED;
 
+    private final CustomPanelAPI mapTabMapArrowPanel = Global.getSettings().createCustom(0f, 0f, new MapArrowRenderer(
+        new MapGetter() {
+            @Override
+            public UIPanelAPI get() {
+                return self.mapTabMap;
+            }
+        }
+    ));
+    private final CustomPanelAPI intelTabMapArrowPanel = Global.getSettings().createCustom(0f, 0f, new MapArrowRenderer(
+        new MapGetter() {
+            @Override
+            public UIPanelAPI get() {
+                return self.intelTabMap;
+            }
+        }
+    ));
+
     private Map<UIPanelAPI, CustomPanelAPI> dialogMaps = new HashMap<>() {
         @Override
         public void clear() {
@@ -887,22 +904,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
             }
         }
     }
-    private final CustomPanelAPI mapTabMapArrowPanel = Global.getSettings().createCustom(0f, 0f, new MapArrowRenderer(
-        new MapGetter() {
-            @Override
-            public UIPanelAPI get() {
-                return self.mapTabMap;
-            }
-        }
-    ));
-    private final CustomPanelAPI intelTabMapArrowPanel = Global.getSettings().createCustom(0f, 0f, new MapArrowRenderer(
-        new MapGetter() {
-            @Override
-            public UIPanelAPI get() {
-                return self.intelTabMap;
-            }
-        }
-    ));
+
     private interface MapGetter {
         public UIPanelAPI get();
     }
