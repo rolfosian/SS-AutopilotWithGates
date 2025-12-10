@@ -2,8 +2,8 @@ package data.scripts.autopilotwithgates;
 
 import java.awt.Color;
 import java.util.EnumSet;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.apache.log4j.Logger;
 import org.lwjgl.opengl.GL11;
@@ -91,7 +91,15 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
     private BaseLocation arrowRenderingLoc;
     private Color arrowColor = DARK_RED;
 
-    private Set<UIComponentAPI> dialogMaps = new HashSet<>();
+    private Map<UIPanelAPI, CustomPanelAPI> dialogMaps = new HashMap<>() {
+        @Override
+        public void clear() {
+            for (Map.Entry<UIPanelAPI, CustomPanelAPI> entry : this.entrySet()) {
+                entry.getKey().removeComponent(entry.getValue());
+            }
+            super.clear();
+        }
+    };
 
     public AutoPilotListener(boolean abilityActive) {
         super(false);
@@ -121,8 +129,8 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                 this.map = null;
                 this.intelTab = null;
                 this.mapTab = null;
-                this.interactionDialogMapParent = null;
                 this.mapArrowRendering = false;
+                if (!this.dialogMaps.isEmpty()) dialogMaps.clear();
             }
 
             this.currentUltimateTarget = null;
@@ -144,6 +152,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
 
         } else if (this.entryGate == null) {
             if (this.renderingArrow) removeArrowRenderer();
+            if (!this.dialogMaps.isEmpty()) this.dialogMaps.clear();
 
             if (this.mapArrowRendering) {
                 this.map.removeComponent(this.mapArrowPanel);
@@ -161,7 +170,10 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
 
             CoreUITabId currentCoreTabId = campaignUI.getCurrentCoreTab();
             InteractionDialogAPI interactionDialog = campaignUI.getCurrentInteractionDialog();
+            boolean dialogMapsIsEmpty = this.dialogMaps.isEmpty();
 
+            // this is a spaghetti mess that i DO NOT LIKE
+            // REFACTOR TO USE DIFFERENT RENDERERS FOR EACH TAB YOU FUCKING RETARD
             if (interactionDialog != null && interactionDialog.getInteractionTarget() != self.entryGate) {
                 if (this.intelTab != null) {
                     this.map.removeComponent(this.mapArrowPanel);
@@ -179,15 +191,16 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                 TreeTraverser trav = new TreeTraverser(interactionDialog);
                 for (TreeNode node : trav.getNodes()) {
                     for (UIComponentAPI child : node.getChildren()) {
-                        if (child.getClass() == UiUtil.mapClass && !dialogMaps.contains(child)) {
-                            this.dialogMaps.add(child);
+                        if (child.getClass() == UiUtil.mapClass && !dialogMaps.containsKey(child)) {
                             UIPanelAPI mape = (UIPanelAPI) child;
-                            mape.addComponent(Global.getSettings().createCustom(0f, 0f, new EphemeralMapArrowRenderer(mape)));
+                            CustomPanelAPI ephArrowPanel = Global.getSettings().createCustom(0f, 0f, new EphemeralMapArrowRenderer(mape));
+                            mape.addComponent(ephArrowPanel);
+                            this.dialogMaps.put(mape, ephArrowPanel);
                         }
                     }
                 }
 
-            } else {
+            } else if (!dialogMapsIsEmpty) {
                 this.dialogMaps.clear();
             }
             
@@ -210,7 +223,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                     }
                 }
 
-                if (!this.mapArrowRendering) {
+                if (!this.mapArrowRendering && dialogMapsIsEmpty) {
                     this.mapArrowRendering = true;
 
                     this.mapTab = UiUtil.coreGetCurrentTab(UiUtil.getCore(campaignUI, interactionDialog));
@@ -238,14 +251,14 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                     }
                 }
 
-                if (!this.mapArrowRendering) {
+                if (!this.mapArrowRendering && dialogMapsIsEmpty) {
                     this.mapArrowRendering = true;
 
                     this.intelTab = UiUtil.coreGetCurrentTab(UiUtil.getCore(campaignUI, interactionDialog));
                     this.map = (UIPanelAPI) getMapFromIntelTab(this.intelTab);
                     this.map.addComponent(this.mapArrowPanel);
 
-                } else {
+                } else if (this.map != null) {
                     UIPanelAPI intTab = UiUtil.coreGetCurrentTab(UiUtil.getCore(campaignUI, interactionDialog));
                     if (intTab != this.intelTab) {
                         this.intelTab = intTab;
@@ -255,18 +268,13 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                     }
                 }
 
-            } else if (this.interactionDialogMapParent != null && interactionDialog == null) {
-                this.map.removeComponent(this.mapArrowPanel);
-                this.map = null;
-                this.interactionDialogMapParent = null;
-                this.mapArrowRendering = false;
-
             } else if (this.mapArrowRendering) {
                 this.map.removeComponent(this.mapArrowPanel);
                 this.map = null;
                 this.mapTab = null;
                 this.intelTab = null;
                 this.mapArrowRendering = false;
+                this.dialogMaps.clear();
             }
             
             if (!playerFleet.isInHyperspace()) return;
@@ -703,7 +711,6 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
 
     private UIPanelAPI mapTab;
     private UIPanelAPI intelTab;
-    private UIPanelAPI interactionDialogMapParent;
     private UIPanelAPI map;
 
     private class MapArrowRenderer extends BaseCustomUIPanelPlugin {
@@ -838,7 +845,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                             if (!(var7 < 1000.0F)) {
                                 var8 = 10.0F;
                                 var9 = 3.0F;
-                                    
+                                
                                 var8 /= var10;
                                 var9 /= var10;
                                 if (var8 < 7.0F) {
@@ -982,6 +989,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                            return;
                         }
 
+                        // if (self.currentUltimateTarget.isInHyperspace() && !var4.isInHyperspace()) var4 = self.currentUltimateTarget;
                         var4 = self.currentUltimateTarget;
 
                         var5 = CampaignEngine.getInstance().getPlayerFleet().getLocationInHyperspace();
@@ -1029,6 +1037,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                             return;
                         }
 
+                        // if (self.currentUltimateTarget.isInHyperspace() && !var4.isInHyperspace()) var4 = self.currentUltimateTarget;
                         var4 = self.currentUltimateTarget;
    
                         var16 = CampaignEngine.getInstance().getPlayerFleet().getLocationInHyperspace();
