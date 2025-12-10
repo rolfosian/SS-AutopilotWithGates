@@ -31,7 +31,7 @@ public class UiUtil implements Opcodes {
         public UIPanelAPI coreGetCurrentTab(Object core);
 
         public EventsPanel getEventsPanel(Object intelTab);
-        public Object eventsPanelGetMap(EventsPanel eventsPanel);
+        public UIPanelAPI eventsPanelGetMap(EventsPanel eventsPanel);
         public UIPanelAPI mapTabGetMap(Object mapTab);
 
         public BaseLocation mapGetLocation(UIPanelAPI map);
@@ -52,11 +52,16 @@ public class UiUtil implements Opcodes {
         Class<?> interactionDialogClass = Refl.getFieldType(Refl.getFieldByName("encounterDialog", CampaignState.class));
 
         Class<?> coreClass = Refl.getReturnType(Refl.getMethod("getCore", CampaignState.class));
+        String coreClassInternalName = Type.getInternalName(coreClass);
+
         Class<?> courseWidgetClass = Refl.getReturnType(Refl.getMethod("getCourseWidget", CampaignState.class));
+        String courseWidgetInternalName = Type.getInternalName(courseWidgetClass);
 
         Class<?> mapTabClass = Refl.getReturnType(Refl.getMethod("getMap", EventsPanel.class));
 
         Class<?> mapClass = Refl.getReturnType(Refl.getMethod("getMap", mapTabClass));
+        String mapClassInternalName = Type.getInternalName(mapClass);
+
         Class<?> uiPanelClass = mapClass.getSuperclass();
 
         Class<?> intelTabClass = Refl.getReturnType(Refl.getMethod("getIntelTab", EventsPanel.class));
@@ -66,7 +71,14 @@ public class UiUtil implements Opcodes {
         String superName = Type.getType(Object.class).getInternalName();
         String interfaceName = Type.getType(UtilInterface.class).getInternalName();
 
-        String uiPanelAPIDescriptor = Type.getDescriptor(UIPanelAPI.class);
+        String coreClassDesc = Type.getDescriptor(coreClass);
+        String mapTabDesc = Type.getDescriptor(mapTabClass);
+        String sectorEntityTokenDesc = Type.getDescriptor(SectorEntityToken.class);
+        String uiPanelAPIDesc = Type.getDescriptor(UIPanelAPI.class);
+        String eventsPanelDesc = Type.getDescriptor(EventsPanel.class);
+        String baseLocationDesc = Type.getDescriptor(BaseLocation.class);
+
+        String campaignStateInternalName = Type.getInternalName(CampaignState.class);
 
         // public class UtilInterface extends Object implements this crap
         cw.visit(
@@ -102,15 +114,16 @@ public class UiUtil implements Opcodes {
                 null
             );
             mv.visitCode();
+            String interactionDialogInternalName = Type.getInternalName(interactionDialogClass);
 
             mv.visitVarInsn(ALOAD, 1);
-            mv.visitTypeInsn(CHECKCAST, Type.getInternalName(interactionDialogClass));
+            mv.visitTypeInsn(CHECKCAST, interactionDialogInternalName);
 
             mv.visitMethodInsn(
                 INVOKEVIRTUAL,
-                Type.getInternalName(interactionDialogClass),
+                interactionDialogInternalName,
                 "getCoreUI",
-                "()" + Type.getDescriptor(coreClass),
+                "()" + coreClassDesc,
                 false
             );
 
@@ -132,13 +145,13 @@ public class UiUtil implements Opcodes {
             mv.visitCode();
 
             mv.visitVarInsn(ALOAD, 1);
-            mv.visitTypeInsn(CHECKCAST, Type.getInternalName(CampaignState.class));
+            mv.visitTypeInsn(CHECKCAST, campaignStateInternalName);
 
             mv.visitMethodInsn(
                 INVOKEVIRTUAL,
-                Type.getInternalName(CampaignState.class),
+                campaignStateInternalName,
                 "getCore",
-                "()" + Type.getDescriptor(coreClass),
+                "()" + coreClassDesc,
                 false
             );
 
@@ -153,18 +166,18 @@ public class UiUtil implements Opcodes {
             MethodVisitor mv = cw.visitMethod(
                 ACC_PUBLIC,
                 "coreGetCurrentTab",
-                "(Ljava/lang/Object;)" + uiPanelAPIDescriptor,
+                "(Ljava/lang/Object;)" + uiPanelAPIDesc,
                 null,
                 null
             );
             mv.visitCode();
 
             mv.visitVarInsn(ALOAD, 1);
-            mv.visitTypeInsn(CHECKCAST, Type.getInternalName(coreClass));
+            mv.visitTypeInsn(CHECKCAST, coreClassInternalName);
 
             mv.visitMethodInsn(
                 INVOKEVIRTUAL,
-                Type.getInternalName(coreClass),
+                coreClassInternalName,
                 "getCurrentTab",
                 "()" + Type.getDescriptor(uiPanelClass),
                 false
@@ -181,7 +194,7 @@ public class UiUtil implements Opcodes {
             MethodVisitor mv = cw.visitMethod(
                 ACC_PUBLIC,
                 "getEventsPanel",
-                "(Ljava/lang/Object;)" + Type.getDescriptor(EventsPanel.class),
+                "(Ljava/lang/Object;)" + eventsPanelDesc,
                 null,
                 null
             );
@@ -194,7 +207,7 @@ public class UiUtil implements Opcodes {
                 INVOKEVIRTUAL,
                 Type.getInternalName(intelTabClass),
                 "getEventsPanel",
-                "()" + Type.getDescriptor(EventsPanel.class),
+                "()" + eventsPanelDesc,
                 false
             );
 
@@ -209,7 +222,7 @@ public class UiUtil implements Opcodes {
             MethodVisitor mv = cw.visitMethod(
                 ACC_PUBLIC,
                 "eventsPanelGetMap",
-                "(" + Type.getDescriptor(EventsPanel.class) + ")Ljava/lang/Object;",
+                "(" + eventsPanelDesc + ")" + uiPanelAPIDesc,
                 null,
                 null
             );
@@ -221,7 +234,7 @@ public class UiUtil implements Opcodes {
                 INVOKEVIRTUAL,
                 Type.getInternalName(EventsPanel.class),
                 "getMap",
-                "()" + Type.getDescriptor(mapTabClass),
+                "()" + mapTabDesc,
                 false
             );
 
@@ -236,7 +249,7 @@ public class UiUtil implements Opcodes {
             MethodVisitor mv = cw.visitMethod(
                 ACC_PUBLIC,
                 "mapTabGetMap",
-                "(Ljava/lang/Object;)" + uiPanelAPIDescriptor,
+                "(Ljava/lang/Object;)" + uiPanelAPIDesc,
                 null,
                 null
             );
@@ -264,7 +277,7 @@ public class UiUtil implements Opcodes {
             MethodVisitor mv = cw.visitMethod(
                 ACC_PUBLIC,
                 "mapGetLocation",
-                "(" + uiPanelAPIDescriptor + ")" + Type.getDescriptor(BaseLocation.class),
+                "(" + uiPanelAPIDesc + ")" + baseLocationDesc,
                 null,
                 null
             );
@@ -272,13 +285,13 @@ public class UiUtil implements Opcodes {
 
             mv.visitVarInsn(ALOAD, 1);
 
-            mv.visitTypeInsn(CHECKCAST, Type.getInternalName(mapClass));
+            mv.visitTypeInsn(CHECKCAST, mapClassInternalName);
 
             mv.visitMethodInsn(
                 INVOKEVIRTUAL,
-                Type.getInternalName(mapClass),
+                mapClassInternalName,
                 "getLocation",
-                "()" + Type.getDescriptor(BaseLocation.class),
+                "()" + baseLocationDesc,
                 false
             );
 
@@ -293,18 +306,18 @@ public class UiUtil implements Opcodes {
             MethodVisitor mv = cw.visitMethod(
                 ACC_PUBLIC,
                 "isRadarMode",
-                "(" + uiPanelAPIDescriptor + ")Z",
+                "(" + uiPanelAPIDesc + ")Z",
                 null,
                 null
             );
             mv.visitCode();
 
             mv.visitVarInsn(ALOAD, 1);
-            mv.visitTypeInsn(CHECKCAST, Type.getInternalName(mapClass));
+            mv.visitTypeInsn(CHECKCAST, mapClassInternalName);
 
             mv.visitMethodInsn(
                 INVOKEVIRTUAL,
-                Type.getInternalName(mapClass),
+                mapClassInternalName,
                 "isRadarMode",
                 "()Z",
                 false
@@ -321,18 +334,18 @@ public class UiUtil implements Opcodes {
             MethodVisitor mv = cw.visitMethod(
                 ACC_PUBLIC,
                 "getZoomTracker",
-                "(" + uiPanelAPIDescriptor + ")Ljava/lang/Object;",
+                "(" + uiPanelAPIDesc + ")Ljava/lang/Object;",
                 null,
                 null
             );
             mv.visitCode();
 
             mv.visitVarInsn(ALOAD, 1);
-            mv.visitTypeInsn(CHECKCAST, Type.getInternalName(mapClass));
+            mv.visitTypeInsn(CHECKCAST, mapClassInternalName);
 
             mv.visitMethodInsn(
                 INVOKEVIRTUAL,
-                Type.getInternalName(mapClass),
+                mapClassInternalName,
                 "getZoomTracker",
                 "()" + Type.getDescriptor(zoomTrackerClass),
                 false
@@ -349,18 +362,18 @@ public class UiUtil implements Opcodes {
             MethodVisitor mv = cw.visitMethod(
                 ACC_PUBLIC,
                 "getFactor",
-                "(" + uiPanelAPIDescriptor + ")F",
+                "(" + uiPanelAPIDesc + ")F",
                 null,
                 null
             );
             mv.visitCode();
 
             mv.visitVarInsn(ALOAD, 1);
-            mv.visitTypeInsn(CHECKCAST, Type.getInternalName(mapClass));
+            mv.visitTypeInsn(CHECKCAST, mapClassInternalName);
 
             mv.visitMethodInsn(
                 INVOKEVIRTUAL,
-                Type.getInternalName(mapClass),
+                mapClassInternalName,
                 "getFactor",
                 "()F",
                 false
@@ -414,11 +427,11 @@ public class UiUtil implements Opcodes {
             mv.visitCode();
 
             mv.visitVarInsn(ALOAD, 1);
-            mv.visitTypeInsn(CHECKCAST, Type.getInternalName(CampaignState.class));
+            mv.visitTypeInsn(CHECKCAST, campaignStateInternalName);
 
             mv.visitMethodInsn(
                 INVOKEVIRTUAL,
-                Type.getInternalName(CampaignState.class),
+                campaignStateInternalName,
                 "getCourseWidget",
                 "()" + Type.getDescriptor(courseWidgetClass),
                 false
@@ -437,24 +450,24 @@ public class UiUtil implements Opcodes {
                 "getNextStep",
                 "(" +
                     "Ljava/lang/Object;" +
-                    Type.getDescriptor(SectorEntityToken.class) +
+                    sectorEntityTokenDesc +
                 ")" +
-                Type.getDescriptor(SectorEntityToken.class),
+                sectorEntityTokenDesc,
                 null,
                 null
             );
             mv.visitCode();
         
             mv.visitVarInsn(ALOAD, 1);
-            mv.visitTypeInsn(CHECKCAST, Type.getInternalName(courseWidgetClass));
+            mv.visitTypeInsn(CHECKCAST, courseWidgetInternalName);
         
             mv.visitVarInsn(ALOAD, 2);
         
             mv.visitMethodInsn(
                 INVOKEVIRTUAL,
-                Type.getInternalName(courseWidgetClass),
+                courseWidgetInternalName,
                 "getNextStep",
-                "(" + Type.getDescriptor(SectorEntityToken.class) + ")" + Type.getDescriptor(SectorEntityToken.class),
+                "(" + sectorEntityTokenDesc + ")" + sectorEntityTokenDesc,
                 false
             );
         
@@ -466,23 +479,24 @@ public class UiUtil implements Opcodes {
 
         // getInner(Object courseWidget)
         {
+            String faderDesc = Type.getDescriptor(Fader.class);
             MethodVisitor mv = cw.visitMethod(
                 ACC_PUBLIC,
                 "getInner",
-                "(Ljava/lang/Object;)" + Type.getDescriptor(Fader.class),
+                "(Ljava/lang/Object;)" + faderDesc,
                 null,
                 null
             );
             mv.visitCode();
 
             mv.visitVarInsn(ALOAD, 1);
-            mv.visitTypeInsn(CHECKCAST, Type.getInternalName(courseWidgetClass));
+            mv.visitTypeInsn(CHECKCAST, courseWidgetInternalName);
 
             mv.visitMethodInsn(
                 INVOKEVIRTUAL,
-                Type.getInternalName(courseWidgetClass),
+                courseWidgetInternalName,
                 "getInner",
-                "()" + Type.getDescriptor(Fader.class),
+                "()" + faderDesc,
                 false
             );
 
@@ -504,11 +518,11 @@ public class UiUtil implements Opcodes {
             mv.visitCode();
 
             mv.visitVarInsn(ALOAD, 1);
-            mv.visitTypeInsn(CHECKCAST, Type.getInternalName(courseWidgetClass));
+            mv.visitTypeInsn(CHECKCAST, courseWidgetInternalName);
 
             mv.visitMethodInsn(
                 INVOKEVIRTUAL,
-                Type.getInternalName(courseWidgetClass),
+                courseWidgetInternalName,
                 "getPhase",
                 "()F",
                 false
@@ -531,12 +545,13 @@ public class UiUtil implements Opcodes {
             );
             mv.visitCode();
 
+            String uiPanelInternalName = Type.getInternalName(uiPanelClass);
             mv.visitVarInsn(ALOAD, 1);
-            mv.visitTypeInsn(CHECKCAST, Type.getInternalName(uiPanelClass));
+            mv.visitTypeInsn(CHECKCAST, uiPanelInternalName);
 
             mv.visitMethodInsn(
                 INVOKEVIRTUAL,
-                Type.getInternalName(uiPanelClass),
+                uiPanelInternalName,
                 "getChildrenNonCopy",
                 "()Ljava/util/List;",
                 false
@@ -548,16 +563,16 @@ public class UiUtil implements Opcodes {
             mv.visitEnd();
         }
         cw.visitEnd();
-
-        byte[] classBytes = cw.toByteArray();
+        
         String classBinaryName = "data/scripts/autopilotwithgates/util/UtilInterface".replace('/', '.');
 
         return new Class<?>[] {(Class<?>) Refl.getMethodDeclaredAndInvokeDirectly("define", new ClassLoader(UiUtil.class.getClassLoader()) {
+            @SuppressWarnings("unused")
             Class<?> define(byte[] b) {
                 return defineClass(classBinaryName, b, 0, b.length);
             }
         },
-        classBytes),
+        cw.toByteArray()),
         mapClass,
         uiPanelClass};
     }
