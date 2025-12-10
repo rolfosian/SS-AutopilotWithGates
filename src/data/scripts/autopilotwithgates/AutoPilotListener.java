@@ -213,8 +213,8 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
             
             if (CoreUITabId.MAP == currentCoreTabId) {
                 if (interactionDialog != null && this.mapTabMap != null) {
-                    this.mapTab = (UIPanelAPI) UiUtil.utils.coreGetCurrentTab(UiUtil.getCore(campaignUI, interactionDialog));
-                    UIPanelAPI mape = (UIPanelAPI) UiUtil.utils.mapTabGetMap(this.mapTab);
+                    this.mapTab = UiUtil.utils.coreGetCurrentTab(UiUtil.getCore(campaignUI, interactionDialog));
+                    UIPanelAPI mape = UiUtil.utils.mapTabGetMap(this.mapTab);
 
                     if (mape != this.mapTabMap) {
                         this.mapTabMap.removeComponent(this.mapTabMapArrowPanel);
@@ -230,16 +230,16 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                 }
 
                 if (this.mapTabMap == null && dialogMapsIsEmpty) {
-                    this.mapTab = (UIPanelAPI) UiUtil.utils.coreGetCurrentTab(UiUtil.getCore(campaignUI, interactionDialog));
+                    this.mapTab = UiUtil.utils.coreGetCurrentTab(UiUtil.getCore(campaignUI, interactionDialog));
 
-                    this.mapTabMap = (UIPanelAPI) UiUtil.utils.mapTabGetMap(this.mapTab);
+                    this.mapTabMap = UiUtil.utils.mapTabGetMap(this.mapTab);
                     this.mapTabMap.addComponent(this.mapTabMapArrowPanel);
                 }
 
             } else if (CoreUITabId.INTEL == currentCoreTabId) {
                 if (interactionDialog != null && this.intelTabMap != null) {
-                    this.intelTab = (UIPanelAPI) UiUtil.utils.coreGetCurrentTab(UiUtil.getCore(campaignUI, interactionDialog));
-                    UIPanelAPI mape = (UIPanelAPI) getMapFromIntelTab(this.intelTab);
+                    this.intelTab = UiUtil.utils.coreGetCurrentTab(UiUtil.getCore(campaignUI, interactionDialog));
+                    UIPanelAPI mape = getMapFromIntelTab(this.intelTab);
 
                     if (mape != this.intelTabMap) {
                         this.intelTabMap.removeComponent(this.intelTabMapArrowPanel);
@@ -255,18 +255,18 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                 }
 
                 if (this.intelTabMap == null && dialogMapsIsEmpty) {
-                    this.intelTab = (UIPanelAPI) UiUtil.utils.coreGetCurrentTab(UiUtil.getCore(campaignUI, interactionDialog));
+                    this.intelTab = UiUtil.utils.coreGetCurrentTab(UiUtil.getCore(campaignUI, interactionDialog));
 
-                    this.intelTabMap = (UIPanelAPI) getMapFromIntelTab(this.intelTab);
+                    this.intelTabMap = getMapFromIntelTab(this.intelTab);
                     this.intelTabMap.addComponent(this.intelTabMapArrowPanel);
 
                 } else if (this.intelTabMap != null) {
-                    UIPanelAPI intTab = (UIPanelAPI) UiUtil.utils.coreGetCurrentTab(UiUtil.getCore(campaignUI, interactionDialog));
+                    UIPanelAPI intTab = UiUtil.utils.coreGetCurrentTab(UiUtil.getCore(campaignUI, interactionDialog));
                     if (intTab != this.intelTab) {
                         this.intelTab = intTab;
 
                         this.intelTabMap.removeComponent(this.intelTabMapArrowPanel);
-                        this.intelTabMap = (UIPanelAPI) getMapFromIntelTab(this.intelTab);
+                        this.intelTabMap = getMapFromIntelTab(this.intelTab);
                         this.intelTabMap.addComponent(this.intelTabMapArrowPanel);
                     }
                 }
@@ -652,7 +652,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
         return UiUtil.fastAtan2(pos2.y - pos1.y, pos2.x - pos1.x) * 57.295784F;
     }
 
-    private Object getMapFromIntelTab(Object intelTab) {
+    private UIPanelAPI getMapFromIntelTab(Object intelTab) {
         EventsPanel eventsPanel = UiUtil.utils.getEventsPanel(intelTab);
         Object outerMap = UiUtil.utils.eventsPanelGetMap(eventsPanel);
         return UiUtil.utils.mapTabGetMap(outerMap);

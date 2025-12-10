@@ -1,8 +1,5 @@
 package data.scripts.autopilotwithgates.util;
 
-import java.lang.invoke.MethodHandle;
-import java.lang.invoke.MethodHandles;
-import java.lang.invoke.MethodType;
 import java.util.List;
 
 import org.apache.log4j.Logger;
@@ -12,7 +9,6 @@ import com.fs.starfarer.api.campaign.SectorEntityToken;
 import com.fs.starfarer.api.ui.UIComponentAPI;
 import com.fs.starfarer.api.ui.UIPanelAPI;
 import com.fs.starfarer.campaign.BaseLocation;
-import com.fs.starfarer.campaign.CampaignEngine;
 import com.fs.starfarer.campaign.CampaignState;
 import com.fs.starfarer.campaign.comms.v2.EventsPanel;
 
@@ -32,11 +28,11 @@ public class UiUtil implements Opcodes {
     public static interface UtilInterface {
         public Object interactionDialogGetCore(Object interactionDialog);
         public Object campaignUIgetCore(Object campaignEngine);
-        public Object coreGetCurrentTab(Object core);
+        public UIPanelAPI coreGetCurrentTab(Object core);
 
         public EventsPanel getEventsPanel(Object intelTab);
         public Object eventsPanelGetMap(EventsPanel eventsPanel);
-        public Object mapTabGetMap(Object mapTab);
+        public UIPanelAPI mapTabGetMap(Object mapTab);
 
         public BaseLocation mapGetLocation(UIPanelAPI map);
         public boolean isRadarMode(UIPanelAPI map);
@@ -53,17 +49,10 @@ public class UiUtil implements Opcodes {
     }
 
     private static Class<?>[] implementUtilInterface() throws Exception {
-        Class<?> campaignUiInterface = null;
-        for (Class<?> cls : CampaignEngine.class.getDeclaredClasses()) {
-            if (cls.isInterface()) {
-                campaignUiInterface = cls;
-                break;
-            }
-        }
         Class<?> interactionDialogClass = Refl.getFieldType(Refl.getFieldByName("encounterDialog", CampaignState.class));
 
-        Class<?> coreClass = Refl.getReturnType(Refl.getMethod("getCore", campaignUiInterface));
-        Class<?> courseWidgetClass = Refl.getReturnType(Refl.getMethod("getCourseWidget", campaignUiInterface));
+        Class<?> coreClass = Refl.getReturnType(Refl.getMethod("getCore", CampaignState.class));
+        Class<?> courseWidgetClass = Refl.getReturnType(Refl.getMethod("getCourseWidget", CampaignState.class));
 
         Class<?> mapTabClass = Refl.getReturnType(Refl.getMethod("getMap", EventsPanel.class));
 
@@ -76,6 +65,8 @@ public class UiUtil implements Opcodes {
         ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS);
         String superName = Type.getType(Object.class).getInternalName();
         String interfaceName = Type.getType(UtilInterface.class).getInternalName();
+
+        String uiPanelAPIDescriptor = Type.getDescriptor(UIPanelAPI.class);
 
         // public class UtilInterface extends Object implements this crap
         cw.visit(
@@ -162,7 +153,7 @@ public class UiUtil implements Opcodes {
             MethodVisitor mv = cw.visitMethod(
                 ACC_PUBLIC,
                 "coreGetCurrentTab",
-                "(Ljava/lang/Object;)Ljava/lang/Object;",
+                "(Ljava/lang/Object;)" + uiPanelAPIDescriptor,
                 null,
                 null
             );
@@ -245,7 +236,7 @@ public class UiUtil implements Opcodes {
             MethodVisitor mv = cw.visitMethod(
                 ACC_PUBLIC,
                 "mapTabGetMap",
-                "(Ljava/lang/Object;)Ljava/lang/Object;",
+                "(Ljava/lang/Object;)" + uiPanelAPIDescriptor,
                 null,
                 null
             );
@@ -273,7 +264,7 @@ public class UiUtil implements Opcodes {
             MethodVisitor mv = cw.visitMethod(
                 ACC_PUBLIC,
                 "mapGetLocation",
-                "(" + Type.getDescriptor(UIPanelAPI.class) + ")" + Type.getDescriptor(BaseLocation.class),
+                "(" + uiPanelAPIDescriptor + ")" + Type.getDescriptor(BaseLocation.class),
                 null,
                 null
             );
@@ -302,7 +293,7 @@ public class UiUtil implements Opcodes {
             MethodVisitor mv = cw.visitMethod(
                 ACC_PUBLIC,
                 "isRadarMode",
-                "(" + Type.getDescriptor(UIPanelAPI.class) + ")Z",
+                "(" + uiPanelAPIDescriptor + ")Z",
                 null,
                 null
             );
@@ -330,7 +321,7 @@ public class UiUtil implements Opcodes {
             MethodVisitor mv = cw.visitMethod(
                 ACC_PUBLIC,
                 "getZoomTracker",
-                "(" + Type.getDescriptor(UIPanelAPI.class) + ")Ljava/lang/Object;",
+                "(" + uiPanelAPIDescriptor + ")Ljava/lang/Object;",
                 null,
                 null
             );
@@ -358,7 +349,7 @@ public class UiUtil implements Opcodes {
             MethodVisitor mv = cw.visitMethod(
                 ACC_PUBLIC,
                 "getFactor",
-                "(" + Type.getDescriptor(UIPanelAPI.class) + ")F",
+                "(" + uiPanelAPIDescriptor + ")F",
                 null,
                 null
             );
@@ -578,7 +569,7 @@ public class UiUtil implements Opcodes {
     static {
         try {
             Class<?>[] result = implementUtilInterface();
-            
+
             utils = (UtilInterface) Refl.instantiateClass(result[0].getConstructors()[0]);
             mapClass = result[1];
             uiPanelClass = result[2];
