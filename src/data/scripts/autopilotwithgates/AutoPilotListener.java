@@ -216,10 +216,16 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                     for (UIComponentAPI child : node.getChildren()) {
                         if (child.getClass() == UiUtil.mapClass && !dialogMaps.containsKey(child)) {
                             UIPanelAPI mape = (UIPanelAPI) child;
-                            CustomPanelAPI ephArrowPanel = Global.getSettings().createCustom(0f, 0f, new EphemeralMapArrowRenderer(mape));
 
-                            mape.addComponent(ephArrowPanel);
-                            this.dialogMaps.put(mape, ephArrowPanel);
+                            CustomPanelAPI arrowPanel = Global.getSettings().createCustom(0f, 0f, new MapArrowRenderer(new MapGetter() {
+                                @Override
+                                public UIPanelAPI get() {
+                                    return mape;
+                                }
+                            }));
+
+                            mape.addComponent(arrowPanel);
+                            this.dialogMaps.put(mape, arrowPanel);
                         }
                     }
                 }
@@ -661,20 +667,6 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
         }
     }
 
-    private static float distanceBetween(Vector2f pos1, Vector2f pos2) {
-        return (float)Math.sqrt((double)((pos1.x - pos2.x) * (pos1.x - pos2.x) + (pos1.y - pos2.y) * (pos1.y - pos2.y)));
-    }
-    
-    private static float angleBetween(Vector2f pos1, Vector2f pos2) {
-        return UiUtil.fastAtan2(pos2.y - pos1.y, pos2.x - pos1.x) * 57.295784F;
-    }
-
-    private UIPanelAPI getMapFromIntelTab(Object intelTab) {
-        EventsPanel eventsPanel = UiUtil.utils.getEventsPanel(intelTab);
-        Object outerMap = UiUtil.utils.eventsPanelGetMap(eventsPanel);
-        return UiUtil.utils.mapTabGetMap(outerMap);
-    }
-
     private UIPanelAPI mapTab;
     private UIPanelAPI mapTabMap;
 
@@ -903,274 +895,71 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                 throw new RuntimeException(e);
             }
         }
+
+        private void renderCourseArrowOnMap(float startX, float startY, float endX, float endY, float pulseValue, float arrowSize, float arrowSpacing, Color arrowColor, float alphaMult, SpriteAPI arrow) {
+            arrow.setSize(arrowSize, arrowSize);
+            arrow.setColor(arrowColor);
+            arrow.setAlphaMult(alphaMult);
+    
+            Vector2f startPos = new Vector2f(startX, startY);
+            Vector2f endPos = new Vector2f(endX, endY);
+    
+            float angle = angleBetween(startPos, endPos);
+            arrow.setAngle(angle - 90.0F);
+    
+            float cosAngle = (float)Math.cos(Math.toRadians((double)angle));
+            float sinAngle = (float)Math.sin(Math.toRadians((double)angle));
+    
+            float distance = distanceBetween(startPos, endPos);
+    
+            float numArrows = (float)((int)(distance / (arrowSize + arrowSpacing)));
+    
+            float fadeStartDistance = arrowSize * 4.0F;
+            float fadeEndDistance = fadeStartDistance;
+            
+            for(float arrowIndex = 0.0F; arrowIndex < numArrows; ++arrowIndex) {
+                float phase;
+                for(phase = pulseValue + arrowIndex * (1.0F / numArrows); phase > 1.0F; --phase) {
+                }
+        
+                float distanceAlongPath = 5.0F + arrowSize + phase * distance;
+                
+                float arrowX = startX + distanceAlongPath * cosAngle;
+                float arrowY = startY + distanceAlongPath * sinAngle;
+    
+                float arrowAlpha = 1.0F;
+                float currentDistance = arrowSize + phase * distance;
+    
+                if (currentDistance < fadeStartDistance) {
+                    arrowAlpha = currentDistance / fadeStartDistance;
+                } else if (currentDistance > distance - fadeEndDistance) {
+                    arrowAlpha = 1.0F - (currentDistance - (distance - fadeEndDistance)) / fadeEndDistance;
+                    if (arrowAlpha < 0.0F) {
+                        arrowAlpha = 0.0F;
+                    }
+                }
+        
+                arrow.setAlphaMult(alphaMult * arrowAlpha);
+                arrow.renderAtCenter(arrowX, arrowY);
+            }
+        }
     }
 
     private interface MapGetter {
         public UIPanelAPI get();
     }
 
-    private void renderCourseArrowOnMap(float startX, float startY, float endX, float endY, float pulseValue, float arrowSize, float arrowSpacing, Color arrowColor, float alphaMult, SpriteAPI arrow) {
-        arrow.setSize(arrowSize, arrowSize);
-        arrow.setColor(arrowColor);
-        arrow.setAlphaMult(alphaMult);
-
-        Vector2f startPos = new Vector2f(startX, startY);
-        Vector2f endPos = new Vector2f(endX, endY);
-
-        float angle = angleBetween(startPos, endPos);
-        arrow.setAngle(angle - 90.0F);
-
-        float cosAngle = (float)Math.cos(Math.toRadians((double)angle));
-        float sinAngle = (float)Math.sin(Math.toRadians((double)angle));
-
-        float distance = distanceBetween(startPos, endPos);
-
-        float numArrows = (float)((int)(distance / (arrowSize + arrowSpacing)));
-
-        float fadeStartDistance = arrowSize * 4.0F;
-        float fadeEndDistance = fadeStartDistance;
-        
-        for(float arrowIndex = 0.0F; arrowIndex < numArrows; ++arrowIndex) {
-            float phase;
-            for(phase = pulseValue + arrowIndex * (1.0F / numArrows); phase > 1.0F; --phase) {
-            }
-    
-            float distanceAlongPath = 5.0F + arrowSize + phase * distance;
-            
-            float arrowX = startX + distanceAlongPath * cosAngle;
-            float arrowY = startY + distanceAlongPath * sinAngle;
-
-            float arrowAlpha = 1.0F;
-            float currentDistance = arrowSize + phase * distance;
-
-            if (currentDistance < fadeStartDistance) {
-                arrowAlpha = currentDistance / fadeStartDistance;
-            } else if (currentDistance > distance - fadeEndDistance) {
-                arrowAlpha = 1.0F - (currentDistance - (distance - fadeEndDistance)) / fadeEndDistance;
-                if (arrowAlpha < 0.0F) {
-                    arrowAlpha = 0.0F;
-                }
-            }
-    
-            arrow.setAlphaMult(alphaMult * arrowAlpha);
-            arrow.renderAtCenter(arrowX, arrowY);
-        }
+    private UIPanelAPI getMapFromIntelTab(Object intelTab) {
+        EventsPanel eventsPanel = UiUtil.utils.getEventsPanel(intelTab);
+        Object outerMap = UiUtil.utils.eventsPanelGetMap(eventsPanel);
+        return UiUtil.utils.mapTabGetMap(outerMap);
     }
 
-    private class EphemeralMapArrowRenderer extends BaseCustomUIPanelPlugin {
-        private float mapArrowPulseValue;
-        private final UIPanelAPI map;
-
-        public EphemeralMapArrowRenderer(UIPanelAPI map) {
-            this.map = map;
-        }
-
-        @Override
-        public void advance(float deltaTime) {
-            if (self.entryGate == null) return;
-
-            try {
-                if (!UiUtil.utils.isRadarMode(this.map)) {
-                    Object courseWidget = UiUtil.utils.getCourseWidget(Global.getSector().getCampaignUI());
-                    SectorEntityToken nextStep = UiUtil.utils.getNextStep(courseWidget, self.currentUltimateTarget);
-                    if (nextStep == null) return;
-
-                    Vector2f playerLocation = CampaignEngine.getInstance().getPlayerFleet().getLocation();
-                    Vector2f targetLocation = nextStep.getLocation();
-
-                    BaseLocation mapLoc = UiUtil.utils.mapGetLocation(map);
-                    if (mapLoc != nextStep.getContainingLocation()) {
-                        if (mapLoc == null || !mapLoc.isHyperspace()) {
-                           return;
-                        }
-
-                        // if (self.currentUltimateTarget.isInHyperspace() && !nextStep.isInHyperspace()) nextStep = self.currentUltimateTarget;
-                        nextStep = self.currentUltimateTarget;
-
-                        playerLocation = CampaignEngine.getInstance().getPlayerFleet().getLocationInHyperspace();
-                        targetLocation = nextStep.getLocationInHyperspace();
-                    }
-
-                    float distance = distanceBetween(playerLocation, targetLocation);
-                    if (distance < 1000.0F) {
-                        distance = 1000.0F;
-                    }
-
-                    for(this.mapArrowPulseValue += deltaTime * 0.1F * 10000.0F / distance; this.mapArrowPulseValue > 1.0F; --this.mapArrowPulseValue) {
-                    }
-                }
-            } catch (Throwable e) {
-                throw new RuntimeException(e);
-            }
-        }
-
-        @Override
-        public void render(float alphaMult) {
-            if (self.entryGate == null) return;
-
-            try {
-                if (!UiUtil.utils.isRadarMode((this.map))) {
-                    Object courseWidget = UiUtil.utils.getCourseWidget(Global.getSector().getCampaignUI());
-                    SectorEntityToken nextStep = UiUtil.utils.getNextStep(courseWidget, self.currentUltimateTarget);
-                    
-                    if (nextStep.isInHyperspace() && nextStep instanceof JumpPointAPI) {
-                        JumpPointAPI jumpPoint = (JumpPointAPI)nextStep;
-                        if (!jumpPoint.getDestinations().isEmpty()) {
-                            SectorEntityToken destination = ((JumpPointAPI.JumpDestination)jumpPoint.getDestinations().get(0)).getDestination();
-                            if (destination != null && destination.getStarSystem() != null) {
-                                nextStep = destination.getStarSystem().getHyperspaceAnchor();
-                            }
-                        }
-                    }
-
-                    Vector2f playerLocation = CampaignEngine.getInstance().getPlayerFleet().getLocation();
-                    Vector2f targetLocation = nextStep.getLocation();
-                    
-                    BaseLocation mapLoc = UiUtil.utils.mapGetLocation(map);
-                    if (mapLoc != nextStep.getContainingLocation()) {
-                        if (mapLoc == null || !mapLoc.isHyperspace()) {
-                            return;
-                        }
-
-                        // if (self.currentUltimateTarget.isInHyperspace() && !nextStep.isInHyperspace()) nextStep = self.currentUltimateTarget;
-                        nextStep = self.currentUltimateTarget;
-   
-                        playerLocation = CampaignEngine.getInstance().getPlayerFleet().getLocationInHyperspace();
-                        targetLocation = nextStep.getLocationInHyperspace();
-                     }
-  
-                    float distance = distanceBetween(playerLocation, targetLocation);
-                    if (!(distance < 1000.0F)) {
-                        float arrowSize = 10.0F;
-                        float arrowSpacing = 3.0F;
-                        float zoomLevel = UiUtil.utils.getZoomLevel(UiUtil.utils.getZoomTracker(this.map));
-                        if (zoomLevel < 0.75F) {
-                            zoomLevel = 0.75F;
-                        }
+    private static float distanceBetween(Vector2f pos1, Vector2f pos2) {
+        return (float)Math.sqrt((double)((pos1.x - pos2.x) * (pos1.x - pos2.x) + (pos1.y - pos2.y) * (pos1.y - pos2.y)));
+    }
     
-                        arrowSize /= zoomLevel;
-                        arrowSpacing /= zoomLevel;
-
-                        if (arrowSize < 7.0F) {
-                            arrowSize = 7.0F;
-                            arrowSpacing = 2.1F;
-                        }
-
-
-                        float factor = UiUtil.utils.getFactor(this.map);
-
-                        float scaledStartX = playerLocation.x * factor;
-                        float scaledStartY = playerLocation.y * factor;
-
-                        float scaledEndX = targetLocation.x * factor;
-                        float scaledEndY = targetLocation.y * factor;
-                        alphaMult *= 0.5F;
-
-                        PositionAPI mapPos = this.map.getPosition();
-
-                        GL11.glPushMatrix();
-                        GL11.glTranslatef((int) mapPos.getCenterX(), (int) mapPos.getCenterY(), 0.0f);
-                        renderCourseArrowOnMap(
-                            scaledStartX,
-                            scaledStartY,
-                            scaledEndX,
-                            scaledEndY,
-                            this.mapArrowPulseValue,
-                            arrowSize,
-                            arrowSpacing,
-                            self.arrowColor,
-                            alphaMult,
-                            arrow
-                        );
-                        
-                        if (mapLoc.isHyperspace()) {
-                            playerLocation = self.entryGate.getLocationInHyperspace();
-                            targetLocation = self.exitGate.getLocationInHyperspace();
-
-                            Color gateArrowColor = Misc.getBasePlayerColor();
-
-                            distance = distanceBetween(playerLocation, targetLocation);
-                            if (!(distance < 1000.0F)) {
-                                arrowSize = 10.0F;
-                                arrowSpacing = 3.0F;
-                                    
-                                arrowSize /= zoomLevel;
-                                arrowSpacing /= zoomLevel;
-
-                                if (arrowSize < 7.0F) {
-                                    arrowSize = 7.0F;
-                                    arrowSpacing = 2.1F;
-                                }
-                                
-                                scaledStartX = playerLocation.x * factor;
-                                scaledStartY = playerLocation.y * factor;
-
-                                scaledEndX = targetLocation.x * factor;
-                                scaledEndY = targetLocation.y * factor;
-            
-                                renderCourseArrowOnMap(
-                                    scaledStartX,
-                                    scaledStartY,
-                                    scaledEndX,
-                                    scaledEndY,
-                                    this.mapArrowPulseValue,
-                                    arrowSize,
-                                    arrowSpacing,
-                                    gateArrowColor,
-                                    alphaMult,
-                                    gateCircle
-                                );
-                            }
-
-                            if ((self.currentUltimateTarget.isInHyperspace() && self.currentUltimateTarget instanceof JumpPointAPI
-                            && ((JumpPointAPI)self.currentUltimateTarget).getDestinationStarSystem() == self.exitGate.getContainingLocation())
-                            || self.currentUltimateTarget.getContainingLocation() == self.exitGate.getContainingLocation()) {
-                                GL11.glPopMatrix();
-                                return;
-                            }
-
-                            playerLocation = self.exitGate.getLocationInHyperspace();
-                            targetLocation = self.currentUltimateTarget.getLocationInHyperspace();
-
-                            distance = distanceBetween(playerLocation, targetLocation);
-                            if (!(distance < 1000.0F)) {
-                                arrowSize = 10.0F;
-                                arrowSpacing = 3.0F;
-                                    
-                                arrowSize /= zoomLevel;
-                                arrowSpacing /= zoomLevel;
-
-                                if (arrowSize < 7.0F) {
-                                    arrowSize = 7.0F;
-                                    arrowSpacing = 2.1F;
-                                }
-                                
-                                scaledStartX = playerLocation.x * factor;
-                                scaledStartY = playerLocation.y * factor;
-
-                                scaledEndX = targetLocation.x * factor;
-                                scaledEndY = targetLocation.y * factor;
-                                
-                                renderCourseArrowOnMap(
-                                    scaledStartX,
-                                    scaledStartY,
-                                    scaledEndX,
-                                    scaledEndY,
-                                    this.mapArrowPulseValue,
-                                    arrowSize,
-                                    arrowSpacing,
-                                    gateArrowColor,
-                                    alphaMult,
-                                    arrow
-                                );
-                            }
-                        }
-                        GL11.glPopMatrix();
-                    }
-                }
-            } catch (Throwable e) {
-                throw new RuntimeException(e);
-            }
-        }
+    private static float angleBetween(Vector2f pos1, Vector2f pos2) {
+        return UiUtil.fastAtan2(pos2.y - pos1.y, pos2.x - pos1.x) * 57.295784F;
     }
 }
