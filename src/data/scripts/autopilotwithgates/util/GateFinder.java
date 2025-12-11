@@ -130,7 +130,8 @@ public class GateFinder {
             List<CustomCampaignEntityAPI> gates = system.getCustomEntitiesWithTag(Tags.GATE);
 
             if (gates.size() > 0) {
-                Vector2f starLoc = system.getHyperspaceAnchor().getLocationInHyperspace();
+                Vector2f starLoc = system.getLocation();
+
                 float dx = starLoc.x - hyperSpaceLoc.x;
                 float dy = starLoc.y - hyperSpaceLoc.y;
                 float distSq = dx*dx + dy*dy;
@@ -153,8 +154,8 @@ public class GateFinder {
         }
 
         // for (SystemGateData systemGateData : AutopilotWithGatesPlugin.systemGateData) {
-        //     float dx = systemGateData.hyperSpaceAnchorLoc.x - hyperSpaceLoc.x;
-        //     float dy = systemGateData.hyperSpaceAnchorLoc.y - hyperSpaceLoc.y;
+        //     float dx = systemGateData.systemLoc.x - hyperSpaceLoc.x;
+        //     float dy = systemGateData.systemLoc.y - hyperSpaceLoc.y;
         //     float distSq = dx*dx + dy*dy;
             
         //     if (distSq < bestDistSq) {
@@ -196,7 +197,8 @@ public class GateFinder {
             List<CustomCampaignEntityAPI> gates = system.getCustomEntitiesWithTag(Tags.GATE);
 
             if (gates.size() > 0) {
-                Vector2f starLoc = system.getHyperspaceAnchor().getLocationInHyperspace();
+                Vector2f starLoc = system.getLocation();
+
                 float dx = starLoc.x - hyperSpaceLoc.x;
                 float dy = starLoc.y - hyperSpaceLoc.y;
                 float distSq = dx*dx + dy*dy;
@@ -219,8 +221,8 @@ public class GateFinder {
         }
 
         // for (SystemGateData systemGateData : AutopilotWithGatesPlugin.systemGateData) {
-        //     float dx = systemGateData.hyperSpaceAnchorLoc.x - hyperSpaceLoc.x;
-        //     float dy = systemGateData.hyperSpaceAnchorLoc.y - hyperSpaceLoc.y;
+        //     float dx = systemGateData.systemLoc.x - hyperSpaceLoc.x;
+        //     float dy = systemGateData.systemLoc.y - hyperSpaceLoc.y;
         //     float distSq = dx*dx + dy*dy;
             
         //     if (distSq < bestDistSq) {
@@ -268,8 +270,15 @@ public class GateFinder {
                 }
             }
         }
+        if (target != null) return target.getLocation();
 
-        return target == null ? loc.getHyperspaceAnchor().getLocation() : target.getLocation();
+        SectorEntityToken hyperSpaceAnchor = loc.getHyperspaceAnchor();
+        if (hyperSpaceAnchor != null) return hyperSpaceAnchor.getLocation();
+
+        SectorEntityToken center = loc.getCenter();
+        if (center != null) return center.getLocation();
+
+        return new Vector2f(0f, 0f);
     }
 
     public static CustomCampaignEntityAPI getNearestGateInLocation(LocationAPI loc, Vector2f targetLoc) {
