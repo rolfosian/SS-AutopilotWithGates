@@ -67,7 +67,6 @@ public class UiUtil implements Opcodes {
         Class<?> intelTabClass = Refl.getReturnType(Refl.getMethod("getIntelTab", EventsPanel.class));
         Class<?> zoomTrackerClass = Refl.getReturnType(Refl.getMethod("getZoomTracker", mapClass));
         
-        ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS);
         String superName = Type.getType(Object.class).getInternalName();
         String interfaceName = Type.getType(UtilInterface.class).getInternalName();
 
@@ -80,6 +79,7 @@ public class UiUtil implements Opcodes {
 
         String campaignStateInternalName = Type.getInternalName(CampaignState.class);
 
+        ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS);
         // public class UtilInterface extends Object implements this crap
         cw.visit(
             V17,

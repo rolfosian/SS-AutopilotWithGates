@@ -1,14 +1,19 @@
 package data.scripts.autopilotwithgates;
 
-import java.util.Map;
+import java.util.*;
+
+import org.lwjgl.util.vector.Vector2f;
 
 import com.fs.starfarer.api.BaseModPlugin;
 import com.fs.starfarer.api.EveryFrameScript;
 import com.fs.starfarer.api.Global;
 import com.fs.starfarer.api.campaign.CampaignFleetAPI;
+import com.fs.starfarer.api.campaign.CustomCampaignEntityAPI;
 import com.fs.starfarer.api.campaign.SectorAPI;
 import com.fs.starfarer.api.campaign.SectorEntityToken;
+import com.fs.starfarer.api.campaign.StarSystemAPI;
 import com.fs.starfarer.api.impl.campaign.GateEntityPlugin;
+import com.fs.starfarer.api.impl.campaign.ids.Tags;
 import com.fs.starfarer.api.impl.campaign.intel.BaseIntelPlugin;
 import com.fs.starfarer.api.ui.TooltipMakerAPI;
 import com.fs.starfarer.api.util.IntervalUtil;
@@ -24,6 +29,7 @@ import com.fs.starfarer.api.campaign.comm.IntelInfoPlugin;
 
 public class AutopilotWithGatesPlugin extends BaseModPlugin {
     public static AutoPilotListener listener;
+    // public static List<SystemGateData> systemGateData;
 
     private static final BaseIntelPlugin unlockedMessagePlugin = new BaseIntelPlugin() {
         @Override
@@ -62,6 +68,8 @@ public class AutopilotWithGatesPlugin extends BaseModPlugin {
             persistentData.put("$autopilotWithGatesAbility", false);
             abilityActive = false;
         }
+
+        // populateSystemGateData();
 
         listener = new AutoPilotListener(abilityActive);
         sector.addTransientListener(listener);
@@ -138,4 +146,16 @@ public class AutopilotWithGatesPlugin extends BaseModPlugin {
             this.arrowRenderingLoc = null;
         }
     }
+
+    // private void populateSystemGateData() {
+    //     systemGateData = new ArrayList<>();
+
+    //     for (StarSystemAPI system : Global.getSector().getStarSystems()) {
+    //         List<CustomCampaignEntityAPI> gates = system.getCustomEntitiesWithTag(Tags.GATE);
+
+    //         if (gates.size() > 0) {
+    //             systemGateData.add(new SystemGateData(system, gates));
+    //         }
+    //     }
+    // }
 }

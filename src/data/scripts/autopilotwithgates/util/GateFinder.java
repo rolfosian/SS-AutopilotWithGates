@@ -15,8 +15,11 @@ import com.fs.starfarer.api.impl.campaign.ids.Tags;
 // import com.fs.starfarer.api.impl.campaign.rulecmd.missions.GateCMD;
 import com.fs.starfarer.api.util.Misc;
 
-import java.util.*;
+// import data.scripts.autopilotwithgates.AutopilotWithGatesPlugin;
+// import data.scripts.autopilotwithgates.SystemGateData;
 
+import java.util.*;
+// TODO Build gate matrix in AutopilotWithGatesPlugin.onGameLoad
 public class GateFinder {
     private static final Logger logger = Logger.getLogger(GateFinder.class);
     public static void print(Object... args) {
@@ -149,6 +152,27 @@ public class GateFinder {
             }
         }
 
+        // for (SystemGateData systemGateData : AutopilotWithGatesPlugin.systemGateData) {
+        //     float dx = systemGateData.hyperSpaceAnchorLoc.x - hyperSpaceLoc.x;
+        //     float dy = systemGateData.hyperSpaceAnchorLoc.y - hyperSpaceLoc.y;
+        //     float distSq = dx*dx + dy*dy;
+            
+        //     if (distSq < bestDistSq) {
+        //         CustomCampaignEntityAPI target = null;
+        //         for (CustomCampaignEntityAPI gate : systemGateData.gates) {
+        //             if (GateEntityPlugin.isScanned(gate)) {
+        //                 target = gate;
+        //                 break;
+        //             }
+        //         }
+        //         if (target == null) continue;
+
+        //         targetGate = target;
+        //         targetSystem = systemGateData.system;
+        //         bestDistSq = distSq;
+        //     }
+        // }
+
         if (targetSystem == null
             || targetSystem ==  playerFleet.getContainingLocation()
             || targetGate == exitGate
@@ -156,7 +180,7 @@ public class GateFinder {
             return null;
         }
 
-        return getNearestGateInLocation(targetSystem, getClosestJumpPoint(targetSystem, targetGate).getLocation());
+        return getNearestGateInLocation(targetSystem, getClosestJumpPointLoc(targetSystem, targetGate));
     }
 
     /**Returns null if nearest gate is in player location or player fleet is closer to ultimate target */
@@ -193,16 +217,37 @@ public class GateFinder {
                 }
             }
         }
+
+        // for (SystemGateData systemGateData : AutopilotWithGatesPlugin.systemGateData) {
+        //     float dx = systemGateData.hyperSpaceAnchorLoc.x - hyperSpaceLoc.x;
+        //     float dy = systemGateData.hyperSpaceAnchorLoc.y - hyperSpaceLoc.y;
+        //     float distSq = dx*dx + dy*dy;
+            
+        //     if (distSq < bestDistSq) {
+        //         CustomCampaignEntityAPI target = null;
+        //         for (CustomCampaignEntityAPI gate : systemGateData.gates) {
+        //             if (GateEntityPlugin.isScanned(gate)) {
+        //                 target = gate;
+        //                 break;
+        //             }
+        //         }
+        //         if (target == null) continue;
+
+        //         targetGate = target;
+        //         targetSystem = systemGateData.system;
+        //         bestDistSq = distSq;
+        //     }
+        // }
         
         if (targetSystem == null
             || targetSystem ==  playerFleet.getContainingLocation()) {
             // || playerFleetIsCloser(playerFleet, targetGate, ultimateTarget)) {
             return null;
         }
-        return getNearestGateInLocation(targetSystem, getClosestJumpPoint(targetSystem, targetGate).getLocation());
+        return getNearestGateInLocation(targetSystem, getClosestJumpPointLoc(targetSystem, targetGate));
     }
 
-    public static JumpPointAPI getClosestJumpPoint(StarSystemAPI loc, CustomCampaignEntityAPI gate) {
+    public static Vector2f getClosestJumpPointLoc(StarSystemAPI loc, CustomCampaignEntityAPI gate) {
         JumpPointAPI target = null;
         List<SectorEntityToken> jps = loc.getJumpPoints();
 
@@ -224,7 +269,7 @@ public class GateFinder {
             }
         }
 
-        return target;
+        return target == null ? loc.getHyperspaceAnchor().getLocation() : target.getLocation();
     }
 
     public static CustomCampaignEntityAPI getNearestGateInLocation(LocationAPI loc, Vector2f targetLoc) {
