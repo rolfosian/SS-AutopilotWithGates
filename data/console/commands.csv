@@ -1,0 +1,2 @@
+command,class,tags,syntax,help
+removeapwg,data.scripts.autopilotwithgates.console.RemoveAbility,"autopilot",remove_gates_autopilot,"Removes the auto pilot with gates ability and saves the game"
