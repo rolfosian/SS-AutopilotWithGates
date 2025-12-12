@@ -36,6 +36,7 @@ $dependencies = @(
     "../../starsector-core/lwjgl_util.jar",
 
     "../LunaLib/jars/LunaLib.jar"
+    "../Console Commands/jars/lw_console.jar"
 )
 
 foreach ($dep in $dependencies) {
