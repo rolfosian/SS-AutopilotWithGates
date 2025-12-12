@@ -246,7 +246,9 @@ public class GateFinder {
             // || playerFleetIsCloser(playerFleet, targetGate, ultimateTarget)) {
             return null;
         }
-        return getNearestGateInLocation(targetSystem, getClosestJumpPointLoc(targetSystem, targetGate));
+
+        if (!(ultimateTarget.getLocation() == targetSystem)) return getNearestGateInLocation(targetSystem, getClosestJumpPointLoc(targetSystem, targetGate));
+        return getNearestGateInLocation(targetSystem, ultimateTarget.getLocation());
     }
 
     public static Vector2f getClosestJumpPointLoc(StarSystemAPI loc, CustomCampaignEntityAPI gate) {
@@ -272,13 +274,7 @@ public class GateFinder {
         }
         if (target != null) return target.getLocation();
 
-        SectorEntityToken hyperSpaceAnchor = loc.getHyperspaceAnchor();
-        if (hyperSpaceAnchor != null) return hyperSpaceAnchor.getLocation();
-
-        SectorEntityToken center = loc.getCenter();
-        if (center != null) return center.getLocation();
-
-        return new Vector2f(0f, 0f);
+        return loc.getCenter().getLocation();
     }
 
     public static CustomCampaignEntityAPI getNearestGateInLocation(LocationAPI loc, Vector2f targetLoc) {
