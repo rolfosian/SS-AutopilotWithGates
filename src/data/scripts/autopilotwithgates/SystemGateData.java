@@ -10,11 +10,11 @@ import com.fs.starfarer.api.campaign.StarSystemAPI;
 public class SystemGateData {
     public final StarSystemAPI system;
     public final Vector2f systemLoc;
-    public final List<CustomCampaignEntityAPI> gates;
+    public final CustomCampaignEntityAPI[] gates;
 
     public SystemGateData(StarSystemAPI system, List<CustomCampaignEntityAPI> gates) {
         this.system = system;
-        this.gates = gates;
         this.systemLoc = system.getLocation();
+        this.gates = gates.toArray(new CustomCampaignEntityAPI[0]);
     }
 }

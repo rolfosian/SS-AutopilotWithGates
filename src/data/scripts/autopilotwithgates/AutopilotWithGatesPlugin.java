@@ -2,19 +2,20 @@ package data.scripts.autopilotwithgates;
 
 import java.util.*;
 
-import org.lwjgl.util.vector.Vector2f;
-
 import com.fs.starfarer.api.BaseModPlugin;
 import com.fs.starfarer.api.EveryFrameScript;
 import com.fs.starfarer.api.Global;
+
 import com.fs.starfarer.api.campaign.CampaignFleetAPI;
 import com.fs.starfarer.api.campaign.CustomCampaignEntityAPI;
 import com.fs.starfarer.api.campaign.SectorAPI;
 import com.fs.starfarer.api.campaign.SectorEntityToken;
 import com.fs.starfarer.api.campaign.StarSystemAPI;
+
 import com.fs.starfarer.api.impl.campaign.GateEntityPlugin;
 import com.fs.starfarer.api.impl.campaign.ids.Tags;
 import com.fs.starfarer.api.impl.campaign.intel.BaseIntelPlugin;
+
 import com.fs.starfarer.api.ui.TooltipMakerAPI;
 import com.fs.starfarer.api.util.IntervalUtil;
 import com.fs.starfarer.api.util.Misc;
@@ -29,7 +30,10 @@ import com.fs.starfarer.api.campaign.comm.IntelInfoPlugin;
 
 public class AutopilotWithGatesPlugin extends BaseModPlugin {
     public static AutoPilotListener listener;
-    // public static List<SystemGateData> systemGateData;
+
+    private Thread systemGateIteratorThread;
+    private static boolean iteratorRunning = true;
+    public static List<SystemGateData> systemGateData;
 
     private static final BaseIntelPlugin unlockedMessagePlugin = new BaseIntelPlugin() {
         @Override
@@ -69,8 +73,6 @@ public class AutopilotWithGatesPlugin extends BaseModPlugin {
             abilityActive = false;
         }
 
-        // populateSystemGateData();
-
         listener = new AutoPilotListener(abilityActive);
         sector.addTransientListener(listener);
         sector.addTransientScript(listener);
@@ -89,6 +91,8 @@ public class AutopilotWithGatesPlugin extends BaseModPlugin {
                 listener.setAbility((AutoPilotGatesAbility) Global.getSector().getPlayerFleet().getAbility("AutoPilotWithGates"));
             }
 
+            registerGateIterator();
+
         } else {
             sector.getCharacterData().removeAbility("AutoPilotWithGates");
             sector.getPlayerFleet().removeAbility("AutoPilotWithGates");
@@ -105,6 +109,8 @@ public class AutopilotWithGatesPlugin extends BaseModPlugin {
                         Global.getSector().getCharacterData().addAbility("AutoPilotWithGates");
                         Global.getSector().getPlayerFleet().addAbility("AutoPilotWithGates");
                         listener.setAbility((AutoPilotGatesAbility) Global.getSector().getPlayerFleet().getAbility("AutoPilotWithGates"));
+
+                        registerGateIterator();
 
                         Global.getSector().getCampaignUI().addMessage(unlockedMessagePlugin, MessageClickAction.NOTHING);
 
@@ -147,15 +153,50 @@ public class AutopilotWithGatesPlugin extends BaseModPlugin {
         }
     }
 
-    // private void populateSystemGateData() {
-    //     systemGateData = new ArrayList<>();
+    private void registerGateIterator() {
+        if (systemGateIteratorThread != null) {
+            iteratorRunning = false;
+            while (systemGateIteratorThread.isAlive()) {
+                systemGateIteratorThread.interrupt();
+            }
+            systemGateData = null;
+        }
 
-    //     for (StarSystemAPI system : Global.getSector().getStarSystems()) {
-    //         List<CustomCampaignEntityAPI> gates = system.getCustomEntitiesWithTag(Tags.GATE);
+        systemGateData = new ArrayList<>();
+        iteratorRunning = true;
 
-    //         if (gates.size() > 0) {
-    //             systemGateData.add(new SystemGateData(system, gates));
-    //         }
-    //     }
-    // }
+        systemGateIteratorThread = new Thread(
+            Thread.currentThread().getThreadGroup(),
+            new Runnable() {
+                @Override
+                public void run() {
+                    while (iteratorRunning) {
+                        List<SystemGateData> newSystemGateData = new ArrayList<>();
+            
+                        for (StarSystemAPI system : Global.getSector().getStarSystems()) {
+                            List<CustomCampaignEntityAPI> gates = system.getCustomEntitiesWithTag(Tags.GATE);
+                
+                            if (gates.size() > 0) newSystemGateData.add(new SystemGateData(system, gates));
+                        }
+        
+                        synchronized(systemGateData) {
+                            systemGateData.clear();
+                            systemGateData.addAll(newSystemGateData);
+                        }
+                        
+                        try {
+                            Thread.sleep(100);
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                            break;
+                        }
+                    }
+                }
+            },
+            "AutopilotWithGatesIterator"
+        );
+
+        systemGateIteratorThread.start();
+        while (systemGateData.isEmpty()) continue;
+    }
 }
