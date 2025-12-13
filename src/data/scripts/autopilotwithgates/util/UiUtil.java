@@ -5,6 +5,7 @@ import java.util.List;
 import org.apache.log4j.Logger;
 
 import com.fs.graphics.util.Fader;
+import com.fs.starfarer.api.campaign.CampaignUIAPI;
 import com.fs.starfarer.api.campaign.SectorEntityToken;
 import com.fs.starfarer.api.ui.UIComponentAPI;
 import com.fs.starfarer.api.ui.UIPanelAPI;
@@ -580,6 +581,7 @@ public class UiUtil implements Opcodes {
     public static final Class<?> mapClass;
     public static final Class<?> uiPanelClass;
     public static final UtilInterface utils;
+    private static final Object campaignUIFollowMouseField;
 
     static {
         try {
@@ -588,6 +590,9 @@ public class UiUtil implements Opcodes {
             utils = (UtilInterface) Refl.instantiateClass(result[0].getConstructors()[0]);
             mapClass = result[1];
             uiPanelClass = result[2];
+
+            campaignUIFollowMouseField = Refl.getFieldByName("followMouse", CampaignState.class);
+            Refl.setFieldAccessible(campaignUIFollowMouseField, true);
 
         } catch (Throwable e) {
             throw new RuntimeException(e);
@@ -600,6 +605,10 @@ public class UiUtil implements Opcodes {
         } catch (Throwable e) {
             throw new RuntimeException(e);
         }
+    }
+
+    public static void setFollowMouse(CampaignUIAPI campaignUI, boolean followMouse) {
+        Refl.setPrivateVariable(campaignUIFollowMouseField, campaignUI, followMouse);
     }
 
     private static int computeBufferSize(Object inputStream, Object inputStreamAvailableMethod) {
