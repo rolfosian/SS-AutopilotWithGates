@@ -8,6 +8,7 @@ import com.fs.starfarer.api.campaign.CampaignFleetAPI;
 import com.fs.starfarer.api.campaign.CustomCampaignEntityAPI;
 import com.fs.starfarer.api.campaign.JumpPointAPI;
 import com.fs.starfarer.api.campaign.LocationAPI;
+import com.fs.starfarer.api.campaign.PlanetAPI;
 import com.fs.starfarer.api.campaign.SectorEntityToken;
 import com.fs.starfarer.api.campaign.StarSystemAPI;
 import com.fs.starfarer.api.impl.campaign.GateEntityPlugin;
@@ -74,47 +75,7 @@ public class GateFinder {
     public static int getFuelCostToUltimateTarget(CampaignFleetAPI playerFleet, SectorEntityToken ultimateTarget) {
         return (int) (playerFleet.getLogistics().getFuelCostPerLightYear() * Misc.getDistanceLY(playerFleet, ultimateTarget));
     }
-
-    // unused
-    public static boolean isPlayerFleetBetweenGates(
-        CampaignFleetAPI playerFleet,
-        SectorEntityToken entryGate,
-        SectorEntityToken exitGate
-    ) {
-        Vector2f playerLoc = playerFleet.getLocationInHyperspace();
-        Vector2f entryLoc = entryGate.getLocationInHyperspace();
-        Vector2f exitLoc = exitGate.getLocationInHyperspace();
     
-        Vector2f ap = Vector2f.sub(playerLoc, entryLoc, null);
-        Vector2f ab = Vector2f.sub(exitLoc, entryLoc, null);
-        float abLenSq = ab.lengthSquared();
-    
-        if (abLenSq == 0f) return false;
-    
-        float t = Vector2f.dot(ap, ab) / abLenSq;
-    
-        if (t < 0f || t > 1f) return false;
-    
-        Vector2f proj = new Vector2f(
-            entryLoc.x + ab.x * t,
-            entryLoc.y + ab.y * t
-        );
-    
-        float dist = Vector2f.sub(playerLoc, proj, null).length();
-        return dist < 50f;
-    }
-    
-    // unused
-    public static boolean isGateInLocation(LocationAPI loc) {
-        if (!(loc instanceof StarSystemAPI)) return false;
-
-        List<CustomCampaignEntityAPI> gates = loc.getCustomEntitiesWithTag(Tags.GATE);
-        if (gates.size() == 0) return false;
-        
-        for (CustomCampaignEntityAPI gate : gates) if (GateEntityPlugin.isScanned(gate)) return true;
-        return false;
-    }
-
     /** Returns null if exit gate is nearest gate to player or player is nearer to ultimate target*/
     public static CustomCampaignEntityAPI getNearestGateToPlayerOutsideLocation(SectorEntityToken exitGate, SectorEntityToken ultimateTarget) {
         if (ultimateTarget == null || exitGate == null) return null;
@@ -123,28 +84,19 @@ public class GateFinder {
         Vector2f targetHyperspaceLoc = playerFleet.getLocationInHyperspace();
         
         SystemGateData targetSystemGateData = null;
+        StarSystemAPI targetSystem = null;
         CustomCampaignEntityAPI targetGate = null;
 
         float bestDistSq = Float.MAX_VALUE;
 
         synchronized(AutopilotWithGatesPlugin.systemGateData) {
             for (SystemGateData systemGateData : AutopilotWithGatesPlugin.systemGateData) {
-                float dx = systemGateData.systemLoc.x - targetHyperspaceLoc.x;
-                float dy = systemGateData.systemLoc.y - targetHyperspaceLoc.y;
-                float distSq = dx*dx + dy*dy;
+                float distSq = getDistSq(systemGateData.systemLoc, targetHyperspaceLoc);
                 
                 if (distSq < bestDistSq) {
-                    CustomCampaignEntityAPI target = null;
-                    for (CustomCampaignEntityAPI gate : systemGateData.gates) {
-                        if (GateEntityPlugin.isScanned(gate)) {
-                            target = gate;
-                            break;
-                        }
-                    }
-                    if (target == null) continue;
-                    
                     targetSystemGateData = systemGateData;
-                    targetGate = target;
+                    targetSystem = systemGateData.system;
+                    targetGate = systemGateData.gates[0];
                     bestDistSq = distSq;
                 }
             }
@@ -157,26 +109,59 @@ public class GateFinder {
             return null;
         }
 
-        List<JumpPointAPI> jumpPoints = new ArrayList<>();
-        for (SectorEntityToken jumpPoint : targetSystemGateData.system.getJumpPoints()) {
-            if (jumpPoint instanceof JumpPointAPI && jumpPoint.getContainingLocation() == targetSystemGateData.system) {
-                jumpPoints.add((JumpPointAPI)jumpPoint);
+        if (targetSystemGateData.gates.length == 1) return targetGate;
+
+        List<SectorEntityToken> jumpPoints = new ArrayList<>();
+        for (SectorEntityToken jumpPoint : targetSystem.getJumpPoints()) {
+            if (jumpPoint instanceof JumpPointAPI && jumpPoint.getContainingLocation() == targetSystem) {
+                jumpPoints.add(jumpPoint);
             }
         }
+        List<PlanetAPI> planets = targetSystem.getPlanets();
 
-        if (jumpPoints.size() > 0) {
+        boolean hasJumpPoints = jumpPoints.size() > 0;
+        boolean hasPlanets = planets.size() > 0;
+
+        if (hasJumpPoints && hasPlanets) {
+            CustomCampaignEntityAPI target = null;
+            bestDistSq = Float.MAX_VALUE;
+        
+            for (CustomCampaignEntityAPI gate : targetSystemGateData.gates) {
+                Vector2f gateLoc = gate.getLocation();
+        
+                SectorEntityToken closestJumpPoint = getClosestJumpPoint(jumpPoints, gateLoc);
+                PlanetAPI closestPlanetGravityWell = getClosestPlanetGravityWell(planets, gateLoc);
+        
+                Vector2f jpLoc = closestJumpPoint.getLocation();
+                Vector2f planetLoc = closestPlanetGravityWell != null ? closestPlanetGravityWell.getLocation() : null;
+        
+                Vector2f referenceLoc = jpLoc;
+        
+                if (planetLoc != null) {
+                    float jpDistSq = getDistSq(gateLoc, jpLoc);
+                    float planetDistSq = getDistSq(gateLoc, planetLoc);
+        
+                    if (planetDistSq < jpDistSq) {
+                        referenceLoc = planetLoc;
+                    }
+                }
+
+                float distSq = getDistSq(gateLoc, referenceLoc);
+        
+                if (distSq < bestDistSq) {
+                    bestDistSq = distSq;
+                    target = gate;
+                }
+            }
+            return target;
+
+        } else if (hasJumpPoints) {
             CustomCampaignEntityAPI target = null;
             bestDistSq = Float.MAX_VALUE;
             
             for (CustomCampaignEntityAPI gate : targetSystemGateData.gates) {
-                if (!GateEntityPlugin.isScanned(gate)) continue;
                 Vector2f gateLoc = gate.getLocation();
-                JumpPointAPI closest = getClosestJumpPoint(jumpPoints, gate.getLocation());
-                Vector2f jpLoc = closest.getLocation();
-
-                float dx = gateLoc.x - jpLoc.x;
-                float dy = gateLoc.y - jpLoc.y;
-                float distSq = dx*dx + dy*dy;
+                float distSq = getDistSq(gateLoc, getClosestJumpPoint(jumpPoints, gateLoc).getLocation());
 
                 if (distSq < bestDistSq) {
                     bestDistSq = distSq;
@@ -184,9 +169,27 @@ public class GateFinder {
                 }
             }
             return target;
+
+        } else if (hasPlanets) {
+            CustomCampaignEntityAPI target = null;
+            bestDistSq = Float.MAX_VALUE;
+            
+            for (CustomCampaignEntityAPI gate : targetSystemGateData.gates) {
+                Vector2f gateLoc = gate.getLocation();
+                PlanetAPI closestPlanetGravityWell = getClosestPlanetGravityWell(planets, gateLoc);
+                if (closestPlanetGravityWell == null) continue;
+
+                float distSq = getDistSq(gate.getLocation(), closestPlanetGravityWell.getLocation());
+
+                if (distSq < bestDistSq) {
+                    bestDistSq = distSq;
+                    target = gate;
+                }
+            }
+            if (target != null) return target;
         }
 
-        return getNearestGateInLocation(targetSystemGateData.system, targetSystemGateData.system.getCenter().getLocation());
+        return getNearestGateInLocation(targetSystem, targetSystem.getCenter().getLocation());
     }
 
     public static CustomCampaignEntityAPI getNearestGateInLocation(LocationAPI loc, Vector2f targetLoc) {
@@ -206,20 +209,15 @@ public class GateFinder {
         float bestDistSq = Float.MAX_VALUE;
         
         for (CustomCampaignEntityAPI gate : gates) {
-            if (GateEntityPlugin.isScanned(gate)) {
-                Vector2f g = gate.getLocation();
-
-                float dx = g.x - targetLoc.x;
-                float dy = g.y - targetLoc.y;
-                float distSq = dx*dx + dy*dy;
+            if (!GateEntityPlugin.isScanned(gate)) continue;
             
-                if (distSq < bestDistSq) {
-                    bestDistSq = distSq;
-                    closest = gate;
-                }
+            float distSq = getDistSq(gate.getLocation(), targetLoc);
+        
+            if (distSq < bestDistSq) {
+                bestDistSq = distSq;
+                closest = gate;
             }
         }
-        
         return closest;
     }
 
@@ -234,20 +232,9 @@ public class GateFinder {
 
         synchronized(AutopilotWithGatesPlugin.systemGateData) {
             for (SystemGateData systemGateData : AutopilotWithGatesPlugin.systemGateData) {
-                float dx = systemGateData.systemLoc.x - targetHyperspaceLoc.x;
-                float dy = systemGateData.systemLoc.y - targetHyperspaceLoc.y;
-                float distSq = dx*dx + dy*dy;
+                float distSq = getDistSq(systemGateData.systemLoc, targetHyperspaceLoc);
                 
                 if (distSq < bestDistSq) {
-                    CustomCampaignEntityAPI target = null;
-                    for (CustomCampaignEntityAPI gate : systemGateData.gates) {
-                        if (GateEntityPlugin.isScanned(gate)) {
-                            target = gate;
-                            break;
-                        }
-                    }
-                    if (target == null) continue;
-                    
                     targetSystemGateData = systemGateData;
                     bestDistSq = distSq;
                 }
@@ -262,41 +249,11 @@ public class GateFinder {
         return getClosestGateToTarget(targetSystemGateData.system, targetSystemGateData.gates, ultimateTarget);
     }
 
-    public static Vector2f getClosestJumpPointLoc(StarSystemAPI loc, CustomCampaignEntityAPI gate) {
-        JumpPointAPI target = null;
-        List<SectorEntityToken> jps = loc.getJumpPoints();
-
-        Vector2f gateLoc = gate.getLocation();
-        float bestDistSq = Float.MAX_VALUE;
-
-        for (SectorEntityToken jp : jps) {
-            if (jp instanceof JumpPointAPI && !jp.isInHyperspace()) {
-                Vector2f jpLoc = jp.getLocation();
-                
-                float dx = jpLoc.x - gateLoc.x;
-                float dy = jpLoc.y - gateLoc.y;
-                float distSq = dx*dx + dy*dy;
-                
-                if (distSq < bestDistSq) {
-                    bestDistSq = distSq;
-                    target = (JumpPointAPI) jp;
-                }
-            }
-        }
-        if (target != null) return target.getLocation();
-
-        return loc.getCenter().getLocation();
-    }
-
     public static float getClosestJumpPointDist(List<JumpPointAPI> jumpPoints, Vector2f gateLoc) {
         float bestDistSq = Float.MAX_VALUE;
 
         for (JumpPointAPI jp : jumpPoints) {
-            Vector2f jpLoc = jp.getLocation();
-            
-            float dx = jpLoc.x - gateLoc.x;
-            float dy = jpLoc.y - gateLoc.y;
-            float distSq = dx*dx + dy*dy;
+            float distSq = getDistSq(jp.getLocation(), gateLoc);
             
             if (distSq < bestDistSq) {
                 bestDistSq = distSq;
@@ -306,16 +263,12 @@ public class GateFinder {
         return bestDistSq;
     }
 
-    public static JumpPointAPI getClosestJumpPoint(List<JumpPointAPI> jumpPoints, Vector2f gateLoc) {
+    public static SectorEntityToken getClosestJumpPoint(List<SectorEntityToken> jumpPoints, Vector2f gateLoc) {
         float bestDistSq = Float.MAX_VALUE;
-        JumpPointAPI target = null;
+        SectorEntityToken target = null;
 
-        for (JumpPointAPI jp : jumpPoints) {
-            Vector2f jpLoc = jp.getLocation();
-            
-            float dx = jpLoc.x - gateLoc.x;
-            float dy = jpLoc.y - gateLoc.y;
-            float distSq = dx*dx + dy*dy;
+        for (SectorEntityToken jp : jumpPoints) {
+            float distSq = getDistSq(jp.getLocation(), gateLoc);
             
             if (distSq < bestDistSq) {
                 bestDistSq = distSq;
@@ -326,12 +279,25 @@ public class GateFinder {
         return target;
     }
 
-    public static CustomCampaignEntityAPI getClosestGateToTarget(StarSystemAPI system, CustomCampaignEntityAPI[] gates, SectorEntityToken ultimateTarget) {
-        if (gates.length == 1) {
-            CustomCampaignEntityAPI gate = gates[0];
-            if (GateEntityPlugin.isScanned(gate)) return gate;
-            return null;
+    public static PlanetAPI getClosestPlanetGravityWell(List<PlanetAPI> planets, Vector2f gateLoc) {
+        float bestDistSq = Float.MAX_VALUE;
+        PlanetAPI target = null;
+
+        for (PlanetAPI planet : planets) {
+            if (planet.isStar() || planet.isBlackHole() || planet.isGasGiant()) {
+                float distSq = getDistSq(planet.getLocation(), gateLoc);
+                
+                if (distSq < bestDistSq) {
+                    bestDistSq = distSq;
+                    target = planet;
+                }
+            }
         }
+        return target;
+    }
+
+    public static CustomCampaignEntityAPI getClosestGateToTarget(StarSystemAPI system, CustomCampaignEntityAPI[] gates, SectorEntityToken ultimateTarget) {
+        if (gates.length == 1) return gates[0];
 
         CustomCampaignEntityAPI target = null;
         float bestDistSq = Float.MAX_VALUE;
@@ -340,14 +306,11 @@ public class GateFinder {
             Vector2f ultimateTargetLoc = ultimateTarget.getLocation();
 
             for (CustomCampaignEntityAPI gate : gates) {
-                if (!GateEntityPlugin.isScanned(gate)) continue;    
                 Vector2f gateLoc = gate.getLocation();
-
-                float dx = ultimateTargetLoc.x - gateLoc.x;
-                float dy = ultimateTargetLoc.y - gateLoc.y;
-                float distSq = dx*dx + dy*dy;
+                float distSq = getDistSq(ultimateTargetLoc, gateLoc);
                 
                 if (distSq < bestDistSq) {
+                    bestDistSq = distSq;
                     target = gate;
                 }
             }
@@ -363,8 +326,6 @@ public class GateFinder {
 
         if (jumpPoints.size() > 0) {
             for (CustomCampaignEntityAPI gate : gates) {
-                if (!GateEntityPlugin.isScanned(gate)) continue;
-    
                 float distSq = getClosestJumpPointDist(jumpPoints, gate.getLocation());
                 if (distSq < bestDistSq) {
                     bestDistSq = distSq;
@@ -374,9 +335,12 @@ public class GateFinder {
             return target;
         }
 
-        for (CustomCampaignEntityAPI gate : gates) {
-            if (GateEntityPlugin.isScanned(gate)) return gate;
-        }
-        return target;
+        return gates[0];
+    }
+
+    public static float getDistSq(Vector2f loc1, Vector2f loc2) {
+        float dx = loc1.x - loc2.x;
+        float dy = loc1.y - loc2.y;
+        return dx*dx + dy*dy;
     }
 }
