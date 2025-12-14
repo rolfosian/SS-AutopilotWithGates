@@ -11,15 +11,17 @@ import com.fs.starfarer.api.campaign.CustomCampaignEntityAPI;
 import com.fs.starfarer.api.campaign.SectorAPI;
 import com.fs.starfarer.api.campaign.SectorEntityToken;
 import com.fs.starfarer.api.campaign.StarSystemAPI;
+import com.fs.starfarer.campaign.BaseLocation;
 
 import com.fs.starfarer.api.impl.campaign.GateEntityPlugin;
 import com.fs.starfarer.api.impl.campaign.ids.Tags;
 import com.fs.starfarer.api.impl.campaign.intel.BaseIntelPlugin;
+import com.fs.starfarer.api.impl.campaign.rulecmd.missions.GateCMD;
 
 import com.fs.starfarer.api.ui.TooltipMakerAPI;
+
 import com.fs.starfarer.api.util.IntervalUtil;
 import com.fs.starfarer.api.util.Misc;
-import com.fs.starfarer.campaign.BaseLocation;
 
 import data.scripts.autopilotwithgates.util.GateFinder;
 import data.scripts.autopilotwithgates.util.Refl;
@@ -71,6 +73,24 @@ public class AutopilotWithGatesPlugin extends BaseModPlugin {
         if (abilityActive == null) {
             persistentData.put("$autopilotWithGatesAbility", false);
             abilityActive = false;
+        }
+
+        // for (StarSystemAPI system : Global.getSector().getStarSystems()) {
+        //     List<CustomCampaignEntityAPI> gates = system.getCustomEntitiesWithTag(Tags.GATE);
+        //     for (CustomCampaignEntityAPI gate : gates) {
+        //         if (!GateEntityPlugin.isScanned(gate)) {
+        //             GateCMD.notifyScanned(gate);
+        //             gate.getMemoryWithoutUpdate().set("$gateScanned", true);
+        //         } 
+        //     }
+        // }
+
+        if (systemGateIteratorThread != null) {
+            iteratorRunning = false;
+            while (systemGateIteratorThread.isAlive()) {
+                systemGateIteratorThread.interrupt();
+            }
+            systemGateData = null;
         }
 
         listener = new AutoPilotListener(abilityActive);
@@ -176,7 +196,13 @@ public class AutopilotWithGatesPlugin extends BaseModPlugin {
                         for (StarSystemAPI system : Global.getSector().getStarSystems()) {
                             List<CustomCampaignEntityAPI> gates = system.getCustomEntitiesWithTag(Tags.GATE);
                 
-                            if (gates.size() > 0) newSystemGateData.add(new SystemGateData(system, gates));
+                            if (gates.size() > 0) {
+                                List<CustomCampaignEntityAPI> gatos = new ArrayList<>();
+                                for (CustomCampaignEntityAPI gate : gates) {
+                                    if (GateEntityPlugin.isScanned(gate)) gatos.add(gate);
+                                }
+                                if (gatos.size() > 0) newSystemGateData.add(new SystemGateData(system, gatos));
+                            } 
                         }
         
                         synchronized(systemGateData) {
@@ -197,6 +223,6 @@ public class AutopilotWithGatesPlugin extends BaseModPlugin {
         );
 
         systemGateIteratorThread.start();
-        while (systemGateData.isEmpty()) continue;
+        while (systemGateData == null) continue;
     }
 }
