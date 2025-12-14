@@ -2,8 +2,11 @@ package data.scripts.autopilotwithgates;
 
 import java.util.*;
 
+import org.lwjgl.opengl.Display;
+
 import com.fs.starfarer.api.BaseModPlugin;
 import com.fs.starfarer.api.EveryFrameScript;
+import com.fs.starfarer.api.GameState;
 import com.fs.starfarer.api.Global;
 
 import com.fs.starfarer.api.campaign.CampaignFleetAPI;
@@ -191,6 +194,15 @@ public class AutopilotWithGatesPlugin extends BaseModPlugin {
                 @Override
                 public void run() {
                     while (iteratorRunning) {
+                        if (!Display.isActive() || Global.getCurrentState() != GameState.CAMPAIGN) {
+                            try {
+                                Thread.sleep(10);
+                                continue;
+                            } catch (InterruptedException e) {
+                                Thread.currentThread().interrupt();
+                                break;
+                            }
+                        }
                         List<SystemGateData> newSystemGateData = new ArrayList<>();
             
                         for (StarSystemAPI system : Global.getSector().getStarSystems()) {
@@ -223,6 +235,5 @@ public class AutopilotWithGatesPlugin extends BaseModPlugin {
         );
 
         systemGateIteratorThread.start();
-        while (systemGateData == null) continue;
     }
 }
