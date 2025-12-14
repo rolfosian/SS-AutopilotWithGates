@@ -163,7 +163,6 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
             this.exitGate = null;
             return;
         }
-        boolean ultimateTargetIsEntryGate = ultimateTarget == this.entryGate;
 
         CampaignFleetAPI playerFleet = Global.getSector().getPlayerFleet();
         LocationAPI playerLoc = playerFleet.getContainingLocation();
@@ -192,7 +191,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
             }
         }
         
-        if (ultimateTargetIsEntryGate) {
+        if (ultimateTarget == this.entryGate) {
             if (GateFinder.getCombinedFuelCost(playerFleet, this.entryGate, this.exitGate, this.currentUltimateTarget)
                 > GateFinder.getFuelCostToUltimateTarget(playerFleet, this.currentUltimateTarget)) this.arrowColor = DARK_GREEN;
             else this.arrowColor = DARK_RED;
@@ -689,213 +688,205 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
             if (self.entryGate == null) return;
             UIPanelAPI mape = this.mapGetter.get();
 
-            try {
-                if (!utils.isRadarMode(mape)) {
-                    Object courseWidget = utils.getCourseWidget(Global.getSector().getCampaignUI());
-                    SectorEntityToken nextStep = utils.getNextStep(courseWidget, self.currentUltimateTarget);
-                    if (nextStep == null) return;
+            if (!utils.isRadarMode(mape)) {
+                Object courseWidget = utils.getCourseWidget(Global.getSector().getCampaignUI());
+                SectorEntityToken nextStep = utils.getNextStep(courseWidget, self.currentUltimateTarget);
+                if (nextStep == null) return;
 
-                    Vector2f playerLocation = CampaignEngine.getInstance().getPlayerFleet().getLocation();
-                    Vector2f targetLocation = nextStep.getLocation();
+                Vector2f playerLocation = CampaignEngine.getInstance().getPlayerFleet().getLocation();
+                Vector2f targetLocation = nextStep.getLocation();
 
-                    BaseLocation mapLoc = utils.mapGetLocation(mape);
-                    if (mapLoc != nextStep.getContainingLocation()) {
-                        LocationAPI campaignMapLocation = CampaignEngine.getInstance().getUIData().getCampaignMapLocation();
-                        if (mapLoc == null || (!mapLoc.isHyperspace() ||
-                            (self.intelTab == null && campaignMapLocation != null && !campaignMapLocation.isHyperspace()))) {
-                           return;
-                        }
-
-                        // if (self.currentUltimateTarget.isInHyperspace() && !nextStep.isInHyperspace()) nextStep = self.currentUltimateTarget;
-                        nextStep = self.currentUltimateTarget;
-
-                        playerLocation = CampaignEngine.getInstance().getPlayerFleet().getLocationInHyperspace();
-                        targetLocation = nextStep.getLocationInHyperspace();
+                BaseLocation mapLoc = utils.mapGetLocation(mape);
+                if (mapLoc != nextStep.getContainingLocation()) {
+                    LocationAPI campaignMapLocation = CampaignEngine.getInstance().getUIData().getCampaignMapLocation();
+                    if (mapLoc == null || (!mapLoc.isHyperspace() ||
+                        (self.intelTab == null && campaignMapLocation != null && !campaignMapLocation.isHyperspace()))) {
+                        return;
                     }
 
-                    float distance = distanceBetween(playerLocation, targetLocation);
-                    if (distance < 1000.0F) {
-                        distance = 1000.0F;
-                    }
+                    nextStep = self.currentUltimateTarget;
 
-                    for(this.mapArrowPulseValue += deltaTime * 0.1F * 10000.0F / distance; this.mapArrowPulseValue > 1.0F; --this.mapArrowPulseValue) {
-                    }
+                    playerLocation = CampaignEngine.getInstance().getPlayerFleet().getLocationInHyperspace();
+                    targetLocation = nextStep.getLocationInHyperspace();
                 }
-            } catch (Throwable e) {
-                throw new RuntimeException(e);
+
+                float distance = distanceBetween(playerLocation, targetLocation);
+                if (distance < 1000.0F) {
+                    distance = 1000.0F;
+                }
+
+                for(this.mapArrowPulseValue += deltaTime * 0.1F * 10000.0F / distance; this.mapArrowPulseValue > 1.0F; --this.mapArrowPulseValue) {
+                }
             }
         }
 
         @Override
         public void render(float alphaMult) {
-            if (self.entryGate == null) return;
+            if (self.entryGate == null || Global.getSector().getCampaignUI().getCurrentCourseTarget() == null) return;
             UIPanelAPI mape = this.mapGetter.get();
 
-            try {
-                if (!utils.isRadarMode(mape)) {
-                    Object courseWidget = utils.getCourseWidget(Global.getSector().getCampaignUI());
-                    SectorEntityToken nextStep = utils.getNextStep(courseWidget, self.currentUltimateTarget);
-                    
-                    if (nextStep.isInHyperspace() && nextStep instanceof JumpPointAPI) {
-                        JumpPointAPI jumpPoint = (JumpPointAPI)nextStep;
-                        if (!jumpPoint.getDestinations().isEmpty()) {
-                            SectorEntityToken destination = ((JumpPointAPI.JumpDestination)jumpPoint.getDestinations().get(0)).getDestination();
-                            if (destination != null && destination.getStarSystem() != null) {
-                                nextStep = destination.getStarSystem().getHyperspaceAnchor();
-                            }
+            if (!utils.isRadarMode(mape)) {
+                Object courseWidget = utils.getCourseWidget(Global.getSector().getCampaignUI());
+                SectorEntityToken nextStep = utils.getNextStep(courseWidget, self.currentUltimateTarget);
+                
+                if (nextStep.isInHyperspace() && nextStep instanceof JumpPointAPI) {
+                    JumpPointAPI jumpPoint = (JumpPointAPI)nextStep;
+                    if (!jumpPoint.getDestinations().isEmpty()) {
+                        SectorEntityToken destination = ((JumpPointAPI.JumpDestination)jumpPoint.getDestinations().get(0)).getDestination();
+                        if (destination != null && destination.getStarSystem() != null) {
+                            nextStep = destination.getStarSystem().getHyperspaceAnchor();
                         }
                     }
+                }
 
-                    Vector2f playerLocation = CampaignEngine.getInstance().getPlayerFleet().getLocation();
-                    Vector2f targetLocation = nextStep.getLocation();
-                    
-                    LocationAPI campaignMapLocation = CampaignEngine.getInstance().getUIData().getCampaignMapLocation();
-                    BaseLocation mapLoc = utils.mapGetLocation(mape);
-                    if (mapLoc != nextStep.getContainingLocation()) {
-                        if (mapLoc == null || (!mapLoc.isHyperspace() ||
-                            (self.intelTab == null && campaignMapLocation != null && !campaignMapLocation.isHyperspace()))) {
+                Vector2f playerLocation = CampaignEngine.getInstance().getPlayerFleet().getLocation();
+                Vector2f targetLocation = nextStep.getLocation();
+                
+                LocationAPI campaignMapLocation = CampaignEngine.getInstance().getUIData().getCampaignMapLocation();
+                BaseLocation mapLoc = utils.mapGetLocation(mape);
+                
+                if (mapLoc != nextStep.getContainingLocation()) {
+                    if (mapLoc == null || (!mapLoc.isHyperspace() ||
+                        (self.intelTab == null && campaignMapLocation != null && !campaignMapLocation.isHyperspace()))) {
+                        return;
+                    }
+
+                    nextStep = self.currentUltimateTarget;
+
+                    playerLocation = CampaignEngine.getInstance().getPlayerFleet().getLocationInHyperspace();
+                    targetLocation = nextStep.getLocationInHyperspace();
+                }
+
+                float distance = distanceBetween(playerLocation, targetLocation);
+                if (!(distance < 1000.0F)) {
+                    float arrowSize = 10.0F;
+                    float arrowSpacing = 3.0F;
+
+                    float zoomLevel = utils.getZoomLevel(utils.getZoomTracker(mape));
+                    if (zoomLevel < 0.75F) {
+                        zoomLevel = 0.75F;
+                    }
+
+                    arrowSize /= zoomLevel;
+                    arrowSpacing /= zoomLevel;
+
+                    if (arrowSize < 7.0F) {
+                        arrowSize = 7.0F;
+                        arrowSpacing = 2.1F;
+                    }
+
+                    float factor = utils.getFactor(mape);
+
+                    float scaledStartX = playerLocation.x * factor;
+                    float scaledStartY = playerLocation.y * factor;
+
+                    float scaledEndX = targetLocation.x * factor;
+                    float scaledEndY = targetLocation.y * factor;
+
+                    alphaMult *= 0.5F;
+
+                    PositionAPI mapPos = mape.getPosition();
+
+                    GL11.glPushMatrix();
+                    GL11.glTranslatef((int) mapPos.getCenterX(), (int) mapPos.getCenterY(), 0.0f);
+                    renderCourseArrowOnMap(
+                        scaledStartX,
+                        scaledStartY,
+                        scaledEndX,
+                        scaledEndY,
+                        this.mapArrowPulseValue,
+                        arrowSize,
+                        arrowSpacing,
+                        self.arrowColor,
+                        alphaMult,
+                        arrow
+                    );
+
+                    if ((campaignMapLocation != null && campaignMapLocation.isHyperspace())
+                        || mapLoc.isHyperspace()) {
+                        playerLocation = self.entryGate.getLocationInHyperspace();
+                        targetLocation = self.exitGate.getLocationInHyperspace();
+
+                        Color gateArrowColor = Misc.getBasePlayerColor();
+
+                        distance = distanceBetween(playerLocation, targetLocation);
+                        if (!(distance < 1000.0F)) {
+                            arrowSize = 10.0F;
+                            arrowSpacing = 3.0F;
+                            
+                            arrowSize /= zoomLevel;
+                            arrowSpacing /= zoomLevel;
+
+                            if (arrowSize < 7.0F) {
+                                arrowSize = 7.0F;
+                                arrowSpacing = 2.1F;
+                            }
+                            
+                            scaledStartX = playerLocation.x * factor;
+                            scaledStartY = playerLocation.y * factor;
+                            
+                            scaledEndX = targetLocation.x * factor;
+                            scaledEndY = targetLocation.y * factor;
+        
+                            renderCourseArrowOnMap(
+                                scaledStartX,
+                                scaledStartY,
+                                scaledEndX,
+                                scaledEndY,
+                                this.mapArrowPulseValue,
+                                arrowSize,
+                                arrowSpacing,
+                                gateArrowColor,
+                                alphaMult,
+                                gateCircle
+                            );
+                        }
+
+                        if ((self.currentUltimateTarget.isInHyperspace() && self.currentUltimateTarget instanceof JumpPointAPI
+                        && ((JumpPointAPI)self.currentUltimateTarget).getDestinationStarSystem() == self.exitGate.getContainingLocation())
+                        || self.currentUltimateTarget.getContainingLocation() == self.exitGate.getContainingLocation()) {
+                            GL11.glPopMatrix();
                             return;
                         }
 
-                        nextStep = self.currentUltimateTarget;
-   
-                        playerLocation = CampaignEngine.getInstance().getPlayerFleet().getLocationInHyperspace();
+                        playerLocation = targetLocation;
                         targetLocation = nextStep.getLocationInHyperspace();
+
+                        distance = distanceBetween(playerLocation, targetLocation);
+                        if (!(distance < 1000.0F)) {
+                            arrowSize = 10.0F;
+                            arrowSpacing = 3.0F;
+                                
+                            arrowSize /= zoomLevel;
+                            arrowSpacing /= zoomLevel;
+
+                            if (arrowSize < 7.0F) {
+                                arrowSize = 7.0F;
+                                arrowSpacing = 2.1F;
+                            }
+                            
+                            scaledStartX = playerLocation.x * factor;
+                            scaledStartY = playerLocation.y * factor;
+
+                            scaledEndX = targetLocation.x * factor;
+                            scaledEndY = targetLocation.y * factor;
+                            
+                            renderCourseArrowOnMap(
+                                scaledStartX,
+                                scaledStartY,
+                                scaledEndX,
+                                scaledEndY,
+                                this.mapArrowPulseValue,
+                                arrowSize,
+                                arrowSpacing,
+                                gateArrowColor,
+                                alphaMult,
+                                arrow
+                            );
+                        }
                     }
-  
-                    float distance = distanceBetween(playerLocation, targetLocation);
-                    if (!(distance < 1000.0F)) {
-                        float arrowSize = 10.0F;
-                        float arrowSpacing = 3.0F;
-
-                        float zoomLevel = utils.getZoomLevel(utils.getZoomTracker(mape));
-                        if (zoomLevel < 0.75F) {
-                            zoomLevel = 0.75F;
-                        }
-    
-                        arrowSize /= zoomLevel;
-                        arrowSpacing /= zoomLevel;
-
-                        if (arrowSize < 7.0F) {
-                            arrowSize = 7.0F;
-                            arrowSpacing = 2.1F;
-                        }
-
-                        float factor = utils.getFactor(mape);
-
-                        float scaledStartX = playerLocation.x * factor;
-                        float scaledStartY = playerLocation.y * factor;
-
-                        float scaledEndX = targetLocation.x * factor;
-                        float scaledEndY = targetLocation.y * factor;
-
-                        alphaMult *= 0.5F;
-
-                        PositionAPI mapPos = mape.getPosition();
-
-                        GL11.glPushMatrix();
-                        GL11.glTranslatef((int) mapPos.getCenterX(), (int) mapPos.getCenterY(), 0.0f);
-                        renderCourseArrowOnMap(
-                            scaledStartX,
-                            scaledStartY,
-                            scaledEndX,
-                            scaledEndY,
-                            this.mapArrowPulseValue,
-                            arrowSize,
-                            arrowSpacing,
-                            self.arrowColor,
-                            alphaMult,
-                            arrow
-                        );
-
-                        if ((campaignMapLocation != null && campaignMapLocation.isHyperspace())
-                            || mapLoc.isHyperspace()) {
-                            playerLocation = self.entryGate.getLocationInHyperspace();
-                            targetLocation = self.exitGate.getLocationInHyperspace();
-
-                            Color gateArrowColor = Misc.getBasePlayerColor();
-
-                            distance = distanceBetween(playerLocation, targetLocation);
-                            if (!(distance < 1000.0F)) {
-                                arrowSize = 10.0F;
-                                arrowSpacing = 3.0F;
-                                
-                                arrowSize /= zoomLevel;
-                                arrowSpacing /= zoomLevel;
-
-                                if (arrowSize < 7.0F) {
-                                    arrowSize = 7.0F;
-                                    arrowSpacing = 2.1F;
-                                }
-                                
-                                scaledStartX = playerLocation.x * factor;
-                                scaledStartY = playerLocation.y * factor;
-                                
-                                scaledEndX = targetLocation.x * factor;
-                                scaledEndY = targetLocation.y * factor;
-            
-                                renderCourseArrowOnMap(
-                                    scaledStartX,
-                                    scaledStartY,
-                                    scaledEndX,
-                                    scaledEndY,
-                                    this.mapArrowPulseValue,
-                                    arrowSize,
-                                    arrowSpacing,
-                                    gateArrowColor,
-                                    alphaMult,
-                                    gateCircle
-                                );
-                            }
-
-                            if ((self.currentUltimateTarget.isInHyperspace() && self.currentUltimateTarget instanceof JumpPointAPI
-                            && ((JumpPointAPI)self.currentUltimateTarget).getDestinationStarSystem() == self.exitGate.getContainingLocation())
-                            || self.currentUltimateTarget.getContainingLocation() == self.exitGate.getContainingLocation()) {
-                                GL11.glPopMatrix();
-                                return;
-                            }
-
-                            playerLocation = self.exitGate.getLocationInHyperspace();
-                            targetLocation = self.currentUltimateTarget.getLocationInHyperspace();
-
-                            distance = distanceBetween(playerLocation, targetLocation);
-                            if (!(distance < 1000.0F)) {
-                                arrowSize = 10.0F;
-                                arrowSpacing = 3.0F;
-                                    
-                                arrowSize /= zoomLevel;
-                                arrowSpacing /= zoomLevel;
-
-                                if (arrowSize < 7.0F) {
-                                    arrowSize = 7.0F;
-                                    arrowSpacing = 2.1F;
-                                }
-                                
-                                scaledStartX = playerLocation.x * factor;
-                                scaledStartY = playerLocation.y * factor;
-
-                                scaledEndX = targetLocation.x * factor;
-                                scaledEndY = targetLocation.y * factor;
-                                
-                                renderCourseArrowOnMap(
-                                    scaledStartX,
-                                    scaledStartY,
-                                    scaledEndX,
-                                    scaledEndY,
-                                    this.mapArrowPulseValue,
-                                    arrowSize,
-                                    arrowSpacing,
-                                    gateArrowColor,
-                                    alphaMult,
-                                    arrow
-                                );
-                            }
-                        }
-                        GL11.glPopMatrix();
-                    }
+                    GL11.glPopMatrix();
                 }
-            } catch (Throwable e) {
-                throw new RuntimeException(e);
             }
         }
 
