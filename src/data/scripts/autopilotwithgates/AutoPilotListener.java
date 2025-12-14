@@ -56,6 +56,7 @@ import data.scripts.autopilotwithgates.util.GateFinder;
 import data.scripts.autopilotwithgates.util.UiUtil;
 import data.scripts.autopilotwithgates.util.TreeTraverser;
 import data.scripts.autopilotwithgates.util.TreeTraverser.TreeNode;
+import data.scripts.autopilotwithgates.util.UiUtil.UtilInterface;
 
 import lunalib.lunaSettings.LunaSettings;
 
@@ -69,6 +70,8 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
         }
         logger.info(sb.toString());
     }
+    private static final UtilInterface utils = UiUtil.utils;
+
     private static final EnumSet<CampaignEngineLayers> layers = EnumSet.of(CampaignEngineLayers.FLEETS);
     private static final Color DARK_RED = new Color(139, 0, 0);
     private static final Color DARK_GREEN = new Color(0, 139, 0);
@@ -137,7 +140,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
         // if (!this.interval.intervalElapsed()) return;
 
         CampaignUIAPI campaignUI = Global.getSector().getCampaignUI();
-        if (UiUtil.utils.getCourseWidget(campaignUI) == null) return;
+        if (utils.getCourseWidget(campaignUI) == null) return;
 
         SectorEntityToken ultimateTarget = campaignUI.getUltimateCourseTarget();
         if (ultimateTarget == null) {
@@ -236,8 +239,8 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
             
             if (CoreUITabId.MAP == currentCoreTabId) {
                 if (interactionDialog != null && this.mapTabMap != null) {
-                    this.mapTab = UiUtil.utils.coreGetCurrentTab(UiUtil.getCore(campaignUI, interactionDialog));
-                    UIPanelAPI mape = UiUtil.utils.mapTabGetMap(this.mapTab);
+                    this.mapTab = utils.coreGetCurrentTab(UiUtil.getCore(campaignUI, interactionDialog));
+                    UIPanelAPI mape = utils.mapTabGetMap(this.mapTab);
 
                     if (mape != this.mapTabMap) {
                         this.mapTabMap.removeComponent(this.mapTabMapArrowPanel);
@@ -253,15 +256,15 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                 }
 
                 if (this.mapTabMap == null && dialogMapsIsEmpty) {
-                    this.mapTab = UiUtil.utils.coreGetCurrentTab(UiUtil.getCore(campaignUI, interactionDialog));
+                    this.mapTab = utils.coreGetCurrentTab(UiUtil.getCore(campaignUI, interactionDialog));
 
-                    this.mapTabMap = UiUtil.utils.mapTabGetMap(this.mapTab);
+                    this.mapTabMap = utils.mapTabGetMap(this.mapTab);
                     this.mapTabMap.addComponent(this.mapTabMapArrowPanel);
                 }
 
             } else if (CoreUITabId.INTEL == currentCoreTabId) {
                 if (interactionDialog != null && this.intelTabMap != null) {
-                    this.intelTab = UiUtil.utils.coreGetCurrentTab(UiUtil.getCore(campaignUI, interactionDialog));
+                    this.intelTab = utils.coreGetCurrentTab(UiUtil.getCore(campaignUI, interactionDialog));
                     UIPanelAPI mape = getMapFromIntelTab(this.intelTab);
 
                     if (mape != this.intelTabMap) {
@@ -278,13 +281,13 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                 }
 
                 if (this.intelTabMap == null && dialogMapsIsEmpty) {
-                    this.intelTab = UiUtil.utils.coreGetCurrentTab(UiUtil.getCore(campaignUI, interactionDialog));
+                    this.intelTab = utils.coreGetCurrentTab(UiUtil.getCore(campaignUI, interactionDialog));
 
                     this.intelTabMap = getMapFromIntelTab(this.intelTab);
                     this.intelTabMap.addComponent(this.intelTabMapArrowPanel);
 
                 } else if (this.intelTabMap != null) {
-                    UIPanelAPI intTab = UiUtil.utils.coreGetCurrentTab(UiUtil.getCore(campaignUI, interactionDialog));
+                    UIPanelAPI intTab = utils.coreGetCurrentTab(UiUtil.getCore(campaignUI, interactionDialog));
                     if (intTab != this.intelTab) {
                         this.intelTab = intTab;
 
@@ -581,15 +584,15 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                 return;
             }
 
-            Object courseWidget = UiUtil.utils.getCourseWidget(Global.getSector().getCampaignUI());
+            Object courseWidget = utils.getCourseWidget(Global.getSector().getCampaignUI());
 
-            SectorEntityToken nextStep = UiUtil.utils.getNextStep(courseWidget, this.currentUltimateTarget);
+            SectorEntityToken nextStep = utils.getNextStep(courseWidget, this.currentUltimateTarget);
             
             if (nextStep == null) {
                 GL11.glPopMatrix();
                 return;
             }
-            alphaMult *= UiUtil.utils.getInner(courseWidget).getBrightness();
+            alphaMult *= utils.getInner(courseWidget).getBrightness();
 
             float arrowSize = 10.0F;
             float zoomFactor = Global.getSector().getCampaignUI().getZoomFactor();
@@ -622,7 +625,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
 
             for(float arrowIndex = 0.0F; arrowIndex < numArrows; ++arrowIndex) {
                 float phase;
-                for(phase = UiUtil.utils.getPhase(courseWidget) + arrowIndex * (1.0F / numArrows); phase > 1.0F; --phase) {
+                for(phase = utils.getPhase(courseWidget) + arrowIndex * (1.0F / numArrows); phase > 1.0F; --phase) {
                 }
 
                 float arrowAlpha = 1.0F;
@@ -687,15 +690,15 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
             UIPanelAPI mape = this.mapGetter.get();
 
             try {
-                if (!UiUtil.utils.isRadarMode(mape)) {
-                    Object courseWidget = UiUtil.utils.getCourseWidget(Global.getSector().getCampaignUI());
-                    SectorEntityToken nextStep = UiUtil.utils.getNextStep(courseWidget, self.currentUltimateTarget);
+                if (!utils.isRadarMode(mape)) {
+                    Object courseWidget = utils.getCourseWidget(Global.getSector().getCampaignUI());
+                    SectorEntityToken nextStep = utils.getNextStep(courseWidget, self.currentUltimateTarget);
                     if (nextStep == null) return;
 
                     Vector2f playerLocation = CampaignEngine.getInstance().getPlayerFleet().getLocation();
                     Vector2f targetLocation = nextStep.getLocation();
 
-                    BaseLocation mapLoc = UiUtil.utils.mapGetLocation(mape);
+                    BaseLocation mapLoc = utils.mapGetLocation(mape);
                     if (mapLoc != nextStep.getContainingLocation()) {
                         LocationAPI campaignMapLocation = CampaignEngine.getInstance().getUIData().getCampaignMapLocation();
                         if (mapLoc == null || (!mapLoc.isHyperspace() ||
@@ -729,9 +732,9 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
             UIPanelAPI mape = this.mapGetter.get();
 
             try {
-                if (!UiUtil.utils.isRadarMode(mape)) {
-                    Object courseWidget = UiUtil.utils.getCourseWidget(Global.getSector().getCampaignUI());
-                    SectorEntityToken nextStep = UiUtil.utils.getNextStep(courseWidget, self.currentUltimateTarget);
+                if (!utils.isRadarMode(mape)) {
+                    Object courseWidget = utils.getCourseWidget(Global.getSector().getCampaignUI());
+                    SectorEntityToken nextStep = utils.getNextStep(courseWidget, self.currentUltimateTarget);
                     
                     if (nextStep.isInHyperspace() && nextStep instanceof JumpPointAPI) {
                         JumpPointAPI jumpPoint = (JumpPointAPI)nextStep;
@@ -747,7 +750,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                     Vector2f targetLocation = nextStep.getLocation();
                     
                     LocationAPI campaignMapLocation = CampaignEngine.getInstance().getUIData().getCampaignMapLocation();
-                    BaseLocation mapLoc = UiUtil.utils.mapGetLocation(mape);
+                    BaseLocation mapLoc = utils.mapGetLocation(mape);
                     if (mapLoc != nextStep.getContainingLocation()) {
                         if (mapLoc == null || (!mapLoc.isHyperspace() ||
                             (self.intelTab == null && campaignMapLocation != null && !campaignMapLocation.isHyperspace()))) {
@@ -765,7 +768,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                         float arrowSize = 10.0F;
                         float arrowSpacing = 3.0F;
 
-                        float zoomLevel = UiUtil.utils.getZoomLevel(UiUtil.utils.getZoomTracker(mape));
+                        float zoomLevel = utils.getZoomLevel(utils.getZoomTracker(mape));
                         if (zoomLevel < 0.75F) {
                             zoomLevel = 0.75F;
                         }
@@ -778,7 +781,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                             arrowSpacing = 2.1F;
                         }
 
-                        float factor = UiUtil.utils.getFactor(mape);
+                        float factor = utils.getFactor(mape);
 
                         float scaledStartX = playerLocation.x * factor;
                         float scaledStartY = playerLocation.y * factor;
@@ -950,9 +953,9 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
     }
 
     private UIPanelAPI getMapFromIntelTab(Object intelTab) {
-        EventsPanel eventsPanel = UiUtil.utils.getEventsPanel(intelTab);
-        Object outerMap = UiUtil.utils.eventsPanelGetMap(eventsPanel);
-        return UiUtil.utils.mapTabGetMap(outerMap);
+        EventsPanel eventsPanel = utils.getEventsPanel(intelTab);
+        Object outerMap = utils.eventsPanelGetMap(eventsPanel);
+        return utils.mapTabGetMap(outerMap);
     }
 
     private static float distanceBetween(Vector2f pos1, Vector2f pos2) {
