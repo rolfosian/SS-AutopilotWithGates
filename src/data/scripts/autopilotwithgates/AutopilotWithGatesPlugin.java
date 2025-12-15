@@ -221,7 +221,7 @@ public class AutopilotWithGatesPlugin extends BaseModPlugin {
                             systemGateData.clear();
                             systemGateData.addAll(newSystemGateData);
                         }
-                        
+
                         try {
                             Thread.sleep(100);
                         } catch (InterruptedException e) {

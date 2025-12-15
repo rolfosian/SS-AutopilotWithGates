@@ -15,8 +15,6 @@ public class Refl {
 
     private static final MethodHandle getFieldNameHandle;
     private static final MethodHandle getFieldTypeHandle;
-    private static final MethodHandle setFieldAccessibleHandle;
-    private static final MethodHandle setFieldHandle;
 
     static {
         try {
@@ -28,8 +26,6 @@ public class Refl {
 
             getFieldNameHandle = lookup.findVirtual(fieldClass, "getName", MethodType.methodType(String.class));
             getFieldTypeHandle = lookup.findVirtual(fieldClass, "getType", MethodType.methodType(Class.class));
-            setFieldAccessibleHandle = lookup.findVirtual(fieldClass, "setAccessible", MethodType.methodType(void.class, boolean.class));
-            setFieldHandle = lookup.findVirtual(fieldClass, "set", MethodType.methodType(void.class, Object.class, Object.class));
 
             getMethodNameHandle = lookup.findVirtual(methodClass, "getName", MethodType.methodType(String.class));
             getParameterTypesHandle = lookup.findVirtual(methodClass, "getParameterTypes", MethodType.methodType(Class[].class));
@@ -53,6 +49,19 @@ public class Refl {
         }
     }
 
+    public static Object getFieldByType(Class<?> type, Class<?> cls) {
+        try {
+            for (Object field : cls.getDeclaredFields()) {
+                if (((Class<?>)getFieldTypeHandle.invoke(field)) == type) {
+                    return field;
+                }
+            }
+        } catch (Throwable e) {
+            throw new RuntimeException(e);
+        }
+        return null;
+    }
+
     public static String getFieldName(Object field) {
         try {
             return (String) getFieldNameHandle.invoke(field);
@@ -72,31 +81,6 @@ public class Refl {
             throw new RuntimeException(e);
         }
         return null;
-    }
-
-    public static void setFieldAccessible(Object field, boolean accessible) {
-        try {
-            setFieldAccessibleHandle.invoke(field, accessible);
-        } catch (Throwable e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    public static void setAccessiblePrivateVariable(Object field, Object instanceToModify, Object newValue) {
-        try {
-            setFieldHandle.invoke(field, instanceToModify, newValue);
-        } catch (Throwable e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    public static void setPrivateVariable(Object field, Object instanceToModify, Object newValue) {
-        try {
-            setFieldAccessibleHandle.invoke(field, true);
-            setFieldHandle.invoke(field, instanceToModify, newValue);
-        } catch (Throwable e) {
-            throw new RuntimeException(e);
-        }
     }
 
     public static Class<?> getReturnType(Object method) {

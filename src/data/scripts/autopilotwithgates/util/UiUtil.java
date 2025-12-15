@@ -1,10 +1,14 @@
 package data.scripts.autopilotwithgates.util;
 
+import java.util.LinkedList;
 import java.util.List;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.VarHandle;
 
 import org.apache.log4j.Logger;
 
 import com.fs.graphics.util.Fader;
+import com.fs.starfarer.api.Global;
 import com.fs.starfarer.api.campaign.CampaignUIAPI;
 import com.fs.starfarer.api.campaign.SectorEntityToken;
 import com.fs.starfarer.api.ui.UIComponentAPI;
@@ -15,6 +19,7 @@ import com.fs.starfarer.campaign.comms.v2.EventsPanel;
 
 import data.scripts.autopilotwithgates.org.objectweb.asm.*;
 
+@SuppressWarnings("unchecked")
 public class UiUtil implements Opcodes {
     private static final Logger logger = Logger.getLogger(UiUtil.class);
     public static void print(Object... args) {
@@ -28,7 +33,7 @@ public class UiUtil implements Opcodes {
 
     public static interface UtilInterface {
         public Object interactionDialogGetCore(Object interactionDialog);
-        public Object campaignUIgetCore(Object campaignEngine);
+        public Object campaignUIgetCore(Object campaignUI);
         public UIPanelAPI coreGetCurrentTab(Object core);
 
         public EventsPanel getEventsPanel(Object intelTab);
@@ -41,6 +46,7 @@ public class UiUtil implements Opcodes {
         public float getFactor(UIPanelAPI map);
         public float getZoomLevel(Object zoomTracker);
 
+        public Object getMessageDisplay(Object campaignUI);
         public Object getCourseWidget(Object campaignUI);
         public SectorEntityToken getNextStep(Object courseWidget, SectorEntityToken target);
         public Fader getInner(Object courseWidget);
@@ -57,6 +63,8 @@ public class UiUtil implements Opcodes {
 
         Class<?> courseWidgetClass = Refl.getReturnType(Refl.getMethod("getCourseWidget", CampaignState.class));
         String courseWidgetInternalName = Type.getInternalName(courseWidgetClass);
+
+        Class<?> messageDisplayClass = Refl.getFieldType(Refl.getFieldByName("messageDisplay", CampaignState.class));
 
         Class<?> mapTabClass = Refl.getReturnType(Refl.getMethod("getMap", EventsPanel.class));
 
@@ -416,6 +424,34 @@ public class UiUtil implements Opcodes {
             mv.visitEnd();
         }
 
+        // getMessageDisplay(Object)
+        {
+            MethodVisitor mv = cw.visitMethod(
+                ACC_PUBLIC,
+                "getMessageDisplay",
+                "(Ljava/lang/Object;)Ljava/lang/Object;",
+                null,
+                null
+            );
+            mv.visitCode();
+
+            mv.visitVarInsn(ALOAD, 1);
+            mv.visitTypeInsn(CHECKCAST, campaignStateInternalName);
+
+            mv.visitMethodInsn(
+                INVOKEVIRTUAL,
+                campaignStateInternalName,
+                "getMessageDisplay",
+                "()" + Type.getDescriptor(messageDisplayClass),
+                false
+            );
+
+            mv.visitInsn(ARETURN);
+
+            mv.visitMaxs(0, 0);
+            mv.visitEnd();
+        }
+
         // getCourseWidget(Object)
         {
             MethodVisitor mv = cw.visitMethod(
@@ -575,13 +611,16 @@ public class UiUtil implements Opcodes {
         },
         cw.toByteArray()),
         mapClass,
-        uiPanelClass};
+        uiPanelClass,
+        messageDisplayClass};
     }
 
     public static final Class<?> mapClass;
     public static final Class<?> uiPanelClass;
     public static final UtilInterface utils;
-    private static final Object campaignUIFollowMouseField;
+
+    private static final VarHandle followMouseVarHandle;
+    private static final VarHandle messageDisplayListVarHandle;
 
     static {
         try {
@@ -590,9 +629,20 @@ public class UiUtil implements Opcodes {
             utils = (UtilInterface) Refl.instantiateClass(result[0].getConstructors()[0]);
             mapClass = result[1];
             uiPanelClass = result[2];
+            Class<?> messageDisplayClass = result[3];
 
-            campaignUIFollowMouseField = Refl.getFieldByName("followMouse", CampaignState.class);
-            Refl.setFieldAccessible(campaignUIFollowMouseField, true);
+            messageDisplayListVarHandle = MethodHandles.privateLookupIn(messageDisplayClass, MethodHandles.lookup()).findVarHandle(
+                messageDisplayClass,
+                Refl.getFieldName(Refl.getFieldByType(LinkedList.class, messageDisplayClass)),
+                LinkedList.class
+            );
+
+            followMouseVarHandle = MethodHandles.privateLookupIn(CampaignState.class, MethodHandles.lookup()).findVarHandle(
+                CampaignState.class,
+                "followMouse",
+                boolean.class
+            );
+
 
         } catch (Throwable e) {
             throw new RuntimeException(e);
@@ -607,8 +657,15 @@ public class UiUtil implements Opcodes {
         }
     }
 
-    public static void setFollowMouse(CampaignUIAPI campaignUI, boolean followMouse) {
-        Refl.setPrivateVariable(campaignUIFollowMouseField, campaignUI, followMouse);
+    public static List<Object> getMessageDisplayList(CampaignUIAPI campaignUI) {
+        return (List<Object>) messageDisplayListVarHandle.get(utils.getMessageDisplay(campaignUI));
+    }
+
+    public static void setFollowMouseTrue(CampaignUIAPI campaignUI) {
+        ((CampaignState)campaignUI).followEntity(null, true);
+        Global.getSector().getPlayerFleet().setInteractionTarget(null);
+
+        followMouseVarHandle.set(campaignUI, true);
     }
 
     private static int computeBufferSize(Object inputStream, Object inputStreamAvailableMethod) {

@@ -1,9 +1,7 @@
 package data.scripts.autopilotwithgates;
 
 import java.awt.Color;
-import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 import org.apache.log4j.Logger;
 import org.lwjgl.opengl.GL11;
@@ -83,13 +81,18 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
     private final boolean autoJump;
     // private IntervalUtil interval = new IntervalUtil(0.1f, 0.1f);
 
+    private final List<Object> messageDisplayList;
+
     private SectorEntityToken currentUltimateTarget;
     private CustomCampaignEntityAPI entryGate;
     private CustomCampaignEntityAPI exitGate;
 
     private boolean postGateJump = false;
     private boolean abilityActive = false;
+    private boolean wasJustActivated = false;
+    private boolean wasJustGotCloserThanGate = false;
 
+    private boolean noExitJumpPoints = true;
     private boolean renderingArrow = false;
     private BaseLocation arrowRenderingLoc;
     private Color arrowColor = DARK_RED;
@@ -131,6 +134,11 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
         } else {
             this.autoJump = Global.getSettings().getBoolean("gateAutopilot_autoJump");
         }
+
+        if (Global.getSector().getPlayerFleet().getContainingLocation() instanceof StarSystemAPI system && system.getEntities(JumpPointAPI.class).size() == 0) this.noExitJumpPoints = true;
+        else this.noExitJumpPoints = false;
+
+        this.messageDisplayList = UiUtil.getMessageDisplayList(Global.getSector().getCampaignUI());
     }
 
     @Override
@@ -316,15 +324,27 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
             if (newEntryGate != null) {
                 if (this.entryGate != newEntryGate) {
                     this.entryGate = newEntryGate;
-                    Global.getSector().layInCourseFor(this.entryGate);
+
+                    boolean followMouse = campaignUI.isPlayerFleetFollowingMouse();
+                    Global.getSector().layInCourseFor(newEntryGate);
+
+                    if (followMouse) UiUtil.setFollowMouseTrue(campaignUI);
+
+                    messageDisplayList.remove(messageDisplayList.size()-1);
                 }
                 return;
 
             } else {
+                boolean followMouse = campaignUI.isPlayerFleetFollowingMouse();
                 Global.getSector().layInCourseFor(this.currentUltimateTarget);
+                
+                if (followMouse) UiUtil.setFollowMouseTrue(campaignUI);
+
+                messageDisplayList.remove(messageDisplayList.size()-1);
                 this.entryGate = null;
                 this.exitGate = null;
                 this.currentUltimateTarget = null;
+                this.wasJustGotCloserThanGate = true;
                 return;
             }
         }
@@ -338,7 +358,14 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                 this.exitGate = GateFinder.getNearestGate(ultimateTarget);
 
                 if (this.exitGate != null) {
+                    boolean followMouse = campaignUI.isPlayerFleetFollowingMouse();
                     Global.getSector().layInCourseFor(this.entryGate);
+
+                    if (this.wasJustActivated && followMouse) UiUtil.setFollowMouseTrue(campaignUI);
+
+                    this.wasJustActivated = false;
+                    this.wasJustGotCloserThanGate = false;
+                    messageDisplayList.remove(messageDisplayList.size()-1);
 
                 } else {
                     this.entryGate = null;
@@ -350,9 +377,18 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
         this.entryGate = GateFinder.getNearestGateToPlayerOutsideLocation(this.exitGate, this.currentUltimateTarget);
 
         if (this.entryGate != null && this.exitGate != null) {
+            boolean followMouse = campaignUI.isPlayerFleetFollowingMouse();
             Global.getSector().layInCourseFor(this.entryGate);
+
+            if ((this.wasJustActivated || this.wasJustGotCloserThanGate) && followMouse) UiUtil.setFollowMouseTrue(campaignUI);
+
+            this.messageDisplayList.remove(messageDisplayList.size()-1);
+            this.wasJustGotCloserThanGate = false;
+            this.wasJustActivated = false;
             return;
         }
+
+        this.wasJustActivated = false;
         this.entryGate = null;
         this.exitGate = null;
         return;
@@ -411,6 +447,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                             public void advance(float arg0) {
                                 if (Global.getSector().getPlayerFleet().getContainingLocation() != exit.getContainingLocation()) return;
                                 Global.getSector().layInCourseFor(ultimateTarget);
+                                messageDisplayList.remove(messageDisplayList.size()-1);
                                 this.isDone = true;
                                 Global.getSector().removeTransientScript(this);
                             }
@@ -455,6 +492,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                             
                             self.ability.deactivate();
                             Global.getSector().layInCourseFor(ultimateTarget);
+                            messageDisplayList.remove(messageDisplayList.size()-1);
 
                             this.isDone = true;
                             Global.getSector().removeTransientScript(this);
@@ -505,23 +543,47 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                     "Travel through the gate to " + exit.getContainingLocation().getName(),
                     "gateAutoPilotRule"
                 );
-                dialog.getOptionPanel().setTooltip("gateAutoPilotRule", "Not enough fuel to make the jump.");
+                dialog.getOptionPanel().addOptionTooltipAppender("gateAutoPilotRule", new OptionTooltipCreator() {
+                    @Override
+                    public void createTooltip(TooltipMakerAPI arg0, boolean arg1) {
+                        arg0.addParaWithMarkup("Not enough fuel to make the jump. Requires {{%s}} fuel.",
+                            0f,
+                            String.valueOf(cost)
+                        );
+                    }
+                });
                 dialog.getOptionPanel().setEnabled("gateAutoPilotRule", false);
                 return;
             }
         }
     }
 
+    @Override
+    public void reportFleetJumped(CampaignFleetAPI fleet, SectorEntityToken from, JumpDestination to) {
+        if (!fleet.isPlayerFleet()) return;
+        if (to.getDestination().getContainingLocation() instanceof StarSystemAPI system && system.getEntities(JumpPointAPI.class).size() == 0) this.noExitJumpPoints = true;
+        else this.noExitJumpPoints = false;
+    }
+
     public void on() {
         this.abilityActive = true;
+        this.wasJustActivated = true;
     }
 
     public void off() {
         this.abilityActive = false;
-
+        
         SectorEntityToken temp = this.currentUltimateTarget;
         this.currentUltimateTarget = null;
+
+        boolean followMouse = Global.getSector().getCampaignUI().isPlayerFleetFollowingMouse();
         Global.getSector().layInCourseFor(temp);
+
+        if (temp != null) {
+            messageDisplayList.remove(messageDisplayList.size()-1);
+            if (followMouse) UiUtil.setFollowMouseTrue(Global.getSector().getCampaignUI());
+        }
+
         removeArrowRenderer();
 
         if (this.intelTabMap != null) {
@@ -538,6 +600,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
 
         if (!this.dialogMaps.isEmpty()) this.dialogMaps.clear();
 
+        this.wasJustGotCloserThanGate = false;
         this.entryGate = null;
         this.exitGate = null;
     }
@@ -652,6 +715,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
 
     @Override
     public void render(CampaignEngineLayers arg0, CombatViewport arg1) {
+        if (this.noExitJumpPoints) return;
         renderCourseArrow();
     }
 
@@ -685,7 +749,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
 
         @Override
         public void advance(float deltaTime) {
-            if (self.entryGate == null) return;
+            if (self.entryGate == null || Global.getSector().getCampaignUI().getCurrentCourseTarget() == null) return;
             UIPanelAPI mape = this.mapGetter.get();
 
             if (!utils.isRadarMode(mape)) {
@@ -693,12 +757,15 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                 SectorEntityToken nextStep = utils.getNextStep(courseWidget, self.currentUltimateTarget);
                 if (nextStep == null) return;
 
-                Vector2f playerLocation = CampaignEngine.getInstance().getPlayerFleet().getLocation();
+                CampaignFleetAPI playerFleet = Global.getSector().getPlayerFleet();
+
+                Vector2f playerLocation = playerFleet.getLocation();
                 Vector2f targetLocation = nextStep.getLocation();
 
                 BaseLocation mapLoc = utils.mapGetLocation(mape);
+                LocationAPI campaignMapLocation = CampaignEngine.getInstance().getUIData().getCampaignMapLocation();
+
                 if (mapLoc != nextStep.getContainingLocation()) {
-                    LocationAPI campaignMapLocation = CampaignEngine.getInstance().getUIData().getCampaignMapLocation();
                     if (mapLoc == null || (!mapLoc.isHyperspace() ||
                         (self.intelTab == null && campaignMapLocation != null && !campaignMapLocation.isHyperspace()))) {
                         return;
@@ -706,7 +773,11 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
 
                     nextStep = self.currentUltimateTarget;
 
-                    playerLocation = CampaignEngine.getInstance().getPlayerFleet().getLocationInHyperspace();
+                    playerLocation = playerFleet.getLocationInHyperspace();
+                    targetLocation = nextStep.getLocationInHyperspace();
+
+                } else if ((self.intelTabMap != null || (campaignMapLocation != null && campaignMapLocation.isHyperspace())) && self.noExitJumpPoints) {
+                    playerLocation = playerFleet.getLocationInHyperspace();
                     targetLocation = nextStep.getLocationInHyperspace();
                 }
 
@@ -739,12 +810,16 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                     }
                 }
 
-                Vector2f playerLocation = CampaignEngine.getInstance().getPlayerFleet().getLocation();
+                CampaignFleetAPI playerFleet = Global.getSector().getPlayerFleet();
+
+                Vector2f playerLocation = playerFleet.getLocation();
                 Vector2f targetLocation = nextStep.getLocation();
                 
                 LocationAPI campaignMapLocation = CampaignEngine.getInstance().getUIData().getCampaignMapLocation();
                 BaseLocation mapLoc = utils.mapGetLocation(mape);
-                
+
+                boolean shouldRenderRegularCourse = true;
+
                 if (mapLoc != nextStep.getContainingLocation()) {
                     if (mapLoc == null || (!mapLoc.isHyperspace() ||
                         (self.intelTab == null && campaignMapLocation != null && !campaignMapLocation.isHyperspace()))) {
@@ -753,8 +828,13 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
 
                     nextStep = self.currentUltimateTarget;
 
-                    playerLocation = CampaignEngine.getInstance().getPlayerFleet().getLocationInHyperspace();
+                    playerLocation = playerFleet.getLocationInHyperspace();
                     targetLocation = nextStep.getLocationInHyperspace();
+
+                } else if (campaignMapLocation.isHyperspace() && self.noExitJumpPoints) {
+                    playerLocation = playerFleet.getLocationInHyperspace();
+                    targetLocation = nextStep.getLocationInHyperspace();
+                    shouldRenderRegularCourse = false;
                 }
 
                 float distance = distanceBetween(playerLocation, targetLocation);
@@ -789,6 +869,8 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
 
                     GL11.glPushMatrix();
                     GL11.glTranslatef((int) mapPos.getCenterX(), (int) mapPos.getCenterY(), 0.0f);
+                    
+                    if (shouldRenderRegularCourse)
                     renderCourseArrowOnMap(
                         scaledStartX,
                         scaledStartY,
