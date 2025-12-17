@@ -326,21 +326,18 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                     this.entryGate = newEntryGate;
 
                     boolean followMouse = campaignUI.isPlayerFleetFollowingMouse();
-                    Global.getSector().layInCourseFor(newEntryGate);
-
+                    this.layInCourseFor(newEntryGate);
+                    
                     if (followMouse) UiUtil.setFollowMouseTrue(campaignUI);
-
-                    messageDisplayList.remove(messageDisplayList.size()-1);
                 }
                 return;
 
             } else {
                 boolean followMouse = campaignUI.isPlayerFleetFollowingMouse();
-                Global.getSector().layInCourseFor(this.currentUltimateTarget);
+                this.layInCourseFor(this.currentUltimateTarget);
                 
                 if (followMouse) UiUtil.setFollowMouseTrue(campaignUI);
 
-                messageDisplayList.remove(messageDisplayList.size()-1);
                 this.entryGate = null;
                 this.exitGate = null;
                 this.currentUltimateTarget = null;
@@ -359,13 +356,12 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
 
                 if (this.exitGate != null) {
                     boolean followMouse = campaignUI.isPlayerFleetFollowingMouse();
-                    Global.getSector().layInCourseFor(this.entryGate);
+                    this.layInCourseFor(this.entryGate);
 
                     if (this.wasJustActivated && followMouse) UiUtil.setFollowMouseTrue(campaignUI);
 
                     this.wasJustActivated = false;
                     this.wasJustGotCloserThanGate = false;
-                    messageDisplayList.remove(messageDisplayList.size()-1);
 
                 } else {
                     this.entryGate = null;
@@ -378,11 +374,10 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
 
         if (this.entryGate != null && this.exitGate != null) {
             boolean followMouse = campaignUI.isPlayerFleetFollowingMouse();
-            Global.getSector().layInCourseFor(this.entryGate);
+            this.layInCourseFor(this.entryGate);
 
             if ((this.wasJustActivated || this.wasJustGotCloserThanGate) && followMouse) UiUtil.setFollowMouseTrue(campaignUI);
 
-            this.messageDisplayList.remove(messageDisplayList.size()-1);
             this.wasJustGotCloserThanGate = false;
             this.wasJustActivated = false;
             return;
@@ -446,8 +441,9 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                             @Override
                             public void advance(float arg0) {
                                 if (Global.getSector().getPlayerFleet().getContainingLocation() != exit.getContainingLocation()) return;
-                                Global.getSector().layInCourseFor(ultimateTarget);
-                                messageDisplayList.remove(messageDisplayList.size()-1);
+
+                                self.layInCourseFor(ultimateTarget);
+
                                 this.isDone = true;
                                 Global.getSector().removeTransientScript(this);
                             }
@@ -491,8 +487,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                             self.abilityActive = false;
                             
                             self.ability.deactivate();
-                            Global.getSector().layInCourseFor(ultimateTarget);
-                            messageDisplayList.remove(messageDisplayList.size()-1);
+                            self.layInCourseFor(ultimateTarget);
 
                             this.isDone = true;
                             Global.getSector().removeTransientScript(this);
@@ -546,9 +541,10 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                 dialog.getOptionPanel().addOptionTooltipAppender("gateAutoPilotRule", new OptionTooltipCreator() {
                     @Override
                     public void createTooltip(TooltipMakerAPI arg0, boolean arg1) {
-                        arg0.addParaWithMarkup("Not enough fuel to make the jump. Requires {{%s}} fuel.",
+                        arg0.addPara("Not enough fuel to make the jump. Requires %s fuel. You have %s fuel available.",
                             0f,
-                            String.valueOf(cost)
+                            new Color[] {Misc.getHighlightColor(), Misc.getNegativeHighlightColor()},
+                            String.valueOf(cost), String.valueOf(available)
                         );
                     }
                 });
@@ -565,6 +561,12 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
         else this.noExitJumpPoints = false;
     }
 
+    private void layInCourseFor(SectorEntityToken target) {
+        int messageDisplayListSize = this.messageDisplayList.size();
+        Global.getSector().layInCourseFor(target);
+        if (this.messageDisplayList.size() > messageDisplayListSize) this.messageDisplayList.remove(this.messageDisplayList.size()-1);
+    }
+
     public void on() {
         this.abilityActive = true;
         this.wasJustActivated = true;
@@ -577,13 +579,10 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
         this.currentUltimateTarget = null;
 
         boolean followMouse = Global.getSector().getCampaignUI().isPlayerFleetFollowingMouse();
-        Global.getSector().layInCourseFor(temp);
+        this.layInCourseFor(temp);
 
-        if (temp != null) {
-            messageDisplayList.remove(messageDisplayList.size()-1);
-            if (followMouse) UiUtil.setFollowMouseTrue(Global.getSector().getCampaignUI());
-        }
-
+        if (temp != null && followMouse) UiUtil.setFollowMouseTrue(Global.getSector().getCampaignUI());
+        
         removeArrowRenderer();
 
         if (this.intelTabMap != null) {
