@@ -1,0 +1,4 @@
+Version 0.0.3b
+
+- Fixed map location npe
+- Added changelog, version files
