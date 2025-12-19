@@ -34,8 +34,7 @@ public class AutoPilotGatesAbility extends BaseToggleAbility {
     @Override
     public void createTooltip(TooltipMakerAPI tooltip, boolean arg1) {
         Color gray = Misc.getGrayColor();
-        String status = " (off)";
-        if (this.isActive()) status = " (on)";
+        String status = this.isActive() ? " (on)" : " (off)";
         
         if (!Global.CODEX_TOOLTIP_MODE) {
             LabelAPI title = tooltip.addTitle(this.spec.getName() + status);
