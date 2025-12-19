@@ -1,4 +1,5 @@
 Version 0.0.3b
 
-- Fixed map location npe
+- Mitigated random crash caused by null mapLocation
+- Fixed rare case of map course arrows not rendering on intel tab hyperspace map if player opens intel tab with interaction dialog open after user has selected an option that shows a smaller map >2 times in a row
 - Added changelog, version files
