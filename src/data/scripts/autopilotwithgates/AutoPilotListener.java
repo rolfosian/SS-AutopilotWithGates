@@ -153,9 +153,9 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
         SectorEntityToken ultimateTarget = campaignUI.getUltimateCourseTarget();
         if (ultimateTarget == null) {
             if (this.mapTabMap != null) {
-                // this.mapTabMap.removeComponent(this.mapTabMapArrowPanel);
-                // this.mapTabMap = null;
-                // this.mapTab = null;
+                this.mapTabMap.removeComponent(this.mapTabMapArrowPanel);
+                this.mapTabMap = null;
+                this.mapTab = null;
             }
 
             if (this.intelTabMap != null) {
@@ -224,7 +224,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                 TreeTraverser trav = new TreeTraverser(interactionDialog);
                 for (TreeNode node : trav.getNodes()) {
                     for (UIComponentAPI child : node.getChildren()) {
-                        if (child.getClass() == UiUtil.mapClass && !dialogMaps.containsKey(child)) {
+                        if (child.getClass() == UiUtil.mapClass && !(child == this.mapTabMap || child == this.intelTabMap) && !dialogMaps.containsKey(child)) {
                             UIPanelAPI mape = (UIPanelAPI) child;
 
                             CustomPanelAPI arrowPanel = Global.getSettings().createCustom(0f, 0f, new MapArrowRenderer(new MapGetter() {
@@ -233,9 +233,10 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                                     return mape;
                                 }
                             }));
-
+                            
                             mape.addComponent(arrowPanel);
                             this.dialogMaps.put(mape, arrowPanel);
+                            dialogMapsIsEmpty = false;
                         }
                     }
                 }
@@ -270,12 +271,26 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                 }
 
             } else if (CoreUITabId.INTEL == currentCoreTabId) {
-                if (interactionDialog != null && this.intelTabMap != null) {
-                    this.intelTab = utils.coreGetCurrentTab(UiUtil.getCore(campaignUI, interactionDialog));
-                    UIPanelAPI mape = getMapFromIntelTab(this.intelTab);
-                    this.intelTabMap.removeComponent(this.intelTabMapArrowPanel);
-                    this.intelTabMap = mape;
-                    this.intelTabMap.addComponent(this.intelTabMapArrowPanel);
+                if (interactionDialog != null) {
+
+                    if (this.intelTab != null) {
+                        this.intelTab = utils.coreGetCurrentTab(UiUtil.getCore(campaignUI, interactionDialog));
+                        UIPanelAPI mape = getMapFromIntelTab(this.intelTab);
+                        
+                        this.intelTabMap.removeComponent(this.intelTabMapArrowPanel);
+                        this.intelTabMap = mape;
+                        this.intelTabMap.addComponent(this.intelTabMapArrowPanel);
+
+                    } else {
+                        UIPanelAPI intTab = utils.coreGetCurrentTab(UiUtil.getCore(campaignUI, interactionDialog));
+                        UIPanelAPI intMap = getMapFromIntelTab(intTab);
+
+                        if (!this.dialogMaps.containsKey(intMap)) {
+                            this.intelTab = intTab;
+                            this.intelTabMap = intMap;
+                            this.intelTabMap.addComponent(this.intelTabMapArrowPanel);
+                        }
+                    }
                 }
 
                 if (this.mapTabMap != null) {
@@ -297,7 +312,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                         this.intelTab = intTab;
 
                         this.intelTabMap.removeComponent(this.intelTabMapArrowPanel);
-                        this.intelTabMap = getMapFromIntelTab(this.intelTab);
+                        this.intelTabMap = intMap;
                         this.intelTabMap.addComponent(this.intelTabMapArrowPanel);
                     }
                 }
@@ -622,8 +637,16 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
         return this.currentUltimateTarget;
     }
 
+    public boolean isNoExitJumpPoints() {
+        return this.noExitJumpPoints;
+    }
+
     public BaseLocation getArrowRenderingLoc() {
         return this.arrowRenderingLoc;
+    }
+
+    public Color getArrowColor() {
+        return this.arrowColor;
     }
 
     private void renderCourseArrow() {
@@ -764,7 +787,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
 
                 if (mapLoc != nextStep.getContainingLocation()) {
                     if (mapLoc == null || (!mapLoc.isHyperspace() ||
-                        (self.intelTab == null && campaignMapLocation != null && !campaignMapLocation.isHyperspace()))) {
+                        (self.intelTab == null && campaignMapLocation != null && !campaignMapLocation.isHyperspace() && Global.getSector().getCampaignUI().getCurrentInteractionDialog() == null))) {
                         return;
                     }
 
@@ -820,7 +843,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
 
                 if (mapLoc != nextStep.getContainingLocation()) {
                     if (mapLoc == null || (!mapLoc.isHyperspace() ||
-                        (self.intelTab == null && campaignMapLocationNonNull && !campaignMapLocation.isHyperspace()))) {
+                        (self.intelTab == null && campaignMapLocationNonNull && !campaignMapLocation.isHyperspace() && Global.getSector().getCampaignUI().getCurrentInteractionDialog() == null))) {
                         return;
                     }
 
