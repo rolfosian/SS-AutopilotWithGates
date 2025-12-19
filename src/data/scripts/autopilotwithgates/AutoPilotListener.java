@@ -73,8 +73,8 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
     private static final EnumSet<CampaignEngineLayers> layers = EnumSet.of(CampaignEngineLayers.FLEETS);
     private static final Color DARK_RED = new Color(139, 0, 0);
     private static final Color DARK_GREEN = new Color(0, 139, 0);
-    private static final SpriteAPI arrow = Global.getSettings().getSprite("graphics/warroom/ship_arrow.png");
-    private static final SpriteAPI gateCircle = Global.getSettings().getSprite("graphics/icons/gate0.png");
+    public static final SpriteAPI arrow = Global.getSettings().getSprite("graphics/warroom/ship_arrow.png");
+    public static final SpriteAPI gateCircle = Global.getSettings().getSprite("graphics/icons/gate0.png");
 
     private final AutoPilotListener self = this;
     private AutoPilotGatesAbility ability;
@@ -153,9 +153,9 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
         SectorEntityToken ultimateTarget = campaignUI.getUltimateCourseTarget();
         if (ultimateTarget == null) {
             if (this.mapTabMap != null) {
-                this.mapTabMap.removeComponent(this.mapTabMapArrowPanel);
-                this.mapTabMap = null;
-                this.mapTab = null;
+                // this.mapTabMap.removeComponent(this.mapTabMapArrowPanel);
+                // this.mapTabMap = null;
+                // this.mapTab = null;
             }
 
             if (this.intelTabMap != null) {
@@ -273,12 +273,9 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                 if (interactionDialog != null && this.intelTabMap != null) {
                     this.intelTab = utils.coreGetCurrentTab(UiUtil.getCore(campaignUI, interactionDialog));
                     UIPanelAPI mape = getMapFromIntelTab(this.intelTab);
-
-                    if (mape != this.intelTabMap) {
-                        this.intelTabMap.removeComponent(this.intelTabMapArrowPanel);
-                        this.intelTabMap = mape;
-                        this.intelTabMap.addComponent(this.intelTabMapArrowPanel);
-                    }
+                    this.intelTabMap.removeComponent(this.intelTabMapArrowPanel);
+                    this.intelTabMap = mape;
+                    this.intelTabMap.addComponent(this.intelTabMapArrowPanel);
                 }
 
                 if (this.mapTabMap != null) {
@@ -295,6 +292,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
 
                 } else if (this.intelTabMap != null) {
                     UIPanelAPI intTab = utils.coreGetCurrentTab(UiUtil.getCore(campaignUI, interactionDialog));
+                    UIPanelAPI intMap = getMapFromIntelTab(this.intelTab);
                     if (intTab != this.intelTab) {
                         this.intelTab = intTab;
 
@@ -775,7 +773,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                     playerLocation = playerFleet.getLocationInHyperspace();
                     targetLocation = nextStep.getLocationInHyperspace();
 
-                } else if ((self.intelTabMap != null || (campaignMapLocation != null && campaignMapLocation.isHyperspace())) && self.noExitJumpPoints) {
+                } else if (self.noExitJumpPoints && (self.intelTabMap != null || (campaignMapLocation != null && campaignMapLocation.isHyperspace()))) {
                     playerLocation = playerFleet.getLocationInHyperspace();
                     targetLocation = nextStep.getLocationInHyperspace();
                 }
@@ -818,10 +816,11 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                 BaseLocation mapLoc = utils.mapGetLocation(mape);
 
                 boolean shouldRenderRegularCourse = true;
+                boolean campaignMapLocationNonNull = campaignMapLocation != null;
 
                 if (mapLoc != nextStep.getContainingLocation()) {
                     if (mapLoc == null || (!mapLoc.isHyperspace() ||
-                        (self.intelTab == null && campaignMapLocation != null && !campaignMapLocation.isHyperspace()))) {
+                        (self.intelTab == null && campaignMapLocationNonNull && !campaignMapLocation.isHyperspace()))) {
                         return;
                     }
 
@@ -830,7 +829,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                     playerLocation = playerFleet.getLocationInHyperspace();
                     targetLocation = nextStep.getLocationInHyperspace();
 
-                } else if (campaignMapLocation.isHyperspace() && self.noExitJumpPoints) {
+                } else if (self.noExitJumpPoints && (self.intelTabMap != null || (campaignMapLocationNonNull && campaignMapLocation.isHyperspace()))) {
                     playerLocation = playerFleet.getLocationInHyperspace();
                     targetLocation = nextStep.getLocationInHyperspace();
                     shouldRenderRegularCourse = false;
@@ -883,7 +882,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                         arrow
                     );
 
-                    if ((campaignMapLocation != null && campaignMapLocation.isHyperspace())
+                    if ((campaignMapLocationNonNull && campaignMapLocation.isHyperspace())
                         || mapLoc.isHyperspace()) {
                         playerLocation = self.entryGate.getLocationInHyperspace();
                         targetLocation = self.exitGate.getLocationInHyperspace();
