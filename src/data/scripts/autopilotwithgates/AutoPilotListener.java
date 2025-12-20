@@ -221,8 +221,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                     this.mapTab = null;
                 }
 
-                TreeTraverser trav = new TreeTraverser(interactionDialog);
-                for (TreeNode node : trav.getNodes()) {
+                for (TreeNode node : new TreeTraverser(interactionDialog).getNodes()) {
                     for (UIComponentAPI child : node.getChildren()) {
                         if (child.getClass() == UiUtil.mapClass && !(child == this.mapTabMap || child == this.intelTabMap) && !dialogMaps.containsKey(child)) {
                             UIPanelAPI mape = (UIPanelAPI) child;
@@ -301,14 +300,14 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
 
                 if (this.intelTabMap == null && dialogMapsIsEmpty) {
                     this.intelTab = utils.coreGetCurrentTab(UiUtil.getCore(campaignUI, interactionDialog));
-
                     this.intelTabMap = getMapFromIntelTab(this.intelTab);
                     this.intelTabMap.addComponent(this.intelTabMapArrowPanel);
 
                 } else if (this.intelTabMap != null) {
                     UIPanelAPI intTab = utils.coreGetCurrentTab(UiUtil.getCore(campaignUI, interactionDialog));
                     UIPanelAPI intMap = getMapFromIntelTab(this.intelTab);
-                    if (intTab != this.intelTab) {
+
+                    if (intMap != this.intelTabMap || intTab != this.intelTab) {
                         this.intelTab = intTab;
 
                         this.intelTabMap.removeComponent(this.intelTabMapArrowPanel);
@@ -951,7 +950,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                             GL11.glPopMatrix();
                             return;
                         }
-
+                        
                         playerLocation = targetLocation;
                         targetLocation = nextStep.getLocationInHyperspace();
 
