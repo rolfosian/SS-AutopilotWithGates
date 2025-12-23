@@ -2,11 +2,10 @@ package data.scripts.autopilotwithgates;
 
 import java.util.List;
 
-import org.lwjgl.input.Keyboard;
-
 import com.fs.starfarer.api.GameState;
 import com.fs.starfarer.api.Global;
 import com.fs.starfarer.api.input.InputEventAPI;
+
 import com.fs.starfarer.api.ui.ButtonAPI;
 import com.fs.starfarer.api.ui.CustomPanelAPI;
 import com.fs.starfarer.api.ui.Fonts;
@@ -14,6 +13,7 @@ import com.fs.starfarer.api.ui.LabelAPI;
 import com.fs.starfarer.api.ui.PositionAPI;
 import com.fs.starfarer.api.ui.UIComponentAPI;
 import com.fs.starfarer.api.ui.UIPanelAPI;
+
 import com.fs.starfarer.api.util.Misc;
 import com.fs.starfarer.api.campaign.BaseCustomUIPanelPlugin;
 
@@ -21,7 +21,6 @@ import com.fs.starfarer.campaign.CampaignEngine;
 import com.fs.starfarer.campaign.CampaignUIPersistentData.AbilitySlots;
 
 import data.scripts.autopilotwithgates.util.UiUtil;
-// import data.scripts.autopilotwithgates.util.UiUtil.ActionListener;
 
 public class AbilityScroller {
     private final CustomPanelAPI scrollPanel;
@@ -81,15 +80,13 @@ public class AbilityScroller {
                 if (Global.getCurrentState() != GameState.CAMPAIGN) return;
 
                 for (InputEventAPI event : events) {
-                    if (!event.isConsumed()) {
-                        if (event.isMouseScrollEvent() && isInBounds(event.getX(), event.getY())) {
-                            if (event.getEventValue() > 0) {
-                                UiUtil.utils.actionPerformed(abilityPanel, null, prevButton);
-                            } else {
-                                UiUtil.utils.actionPerformed(abilityPanel, null, nextButton);
-                            }
-                            event.consume();
+                    if (!event.isConsumed() && event.isMouseScrollEvent() && isInBounds(event.getX(), event.getY())) {
+                        if (event.getEventValue() > 0) {
+                            UiUtil.utils.actionPerformed(abilityPanel, null, prevButton);
+                        } else {
+                            UiUtil.utils.actionPerformed(abilityPanel, null, nextButton);
                         }
+                        event.consume();
                     }
                 }
             }
