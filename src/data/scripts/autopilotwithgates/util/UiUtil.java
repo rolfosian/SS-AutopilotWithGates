@@ -17,6 +17,7 @@ import com.fs.starfarer.api.Global;
 import com.fs.starfarer.api.campaign.CampaignUIAPI;
 import com.fs.starfarer.api.campaign.SectorEntityToken;
 import com.fs.starfarer.api.ui.ButtonAPI;
+import com.fs.starfarer.api.ui.PositionAPI;
 import com.fs.starfarer.api.ui.UIComponentAPI;
 import com.fs.starfarer.api.ui.UIPanelAPI;
 import com.fs.starfarer.campaign.BaseLocation;
@@ -63,6 +64,10 @@ public class UiUtil implements Opcodes {
 
         public void buttonSetListener(Object button, Object listener);
         public Object buttonGetListener(Object button);
+        
+        public Object uiComponentGetTooltip(Object uiComponent);
+        public void uiComponentShowTooltip(Object uiComponent, Object tooltip);
+        public void uiComponentHideTooltip(Object uiComponent, Object tooltip);
 
         public List<UIComponentAPI> getChildrenNonCopy(Object uiPanel);
     }
@@ -84,6 +89,9 @@ public class UiUtil implements Opcodes {
         String mapClassInternalName = Type.getInternalName(mapClass);
 
         Class<?> uiPanelClass = mapClass.getSuperclass();
+        Class<?> uiComponentClass = uiPanelClass.getSuperclass();
+        Class<?> toolTipClass = Refl.getReturnType(Refl.getMethod("getTooltip", uiComponentClass));
+        String uiComponentInternalName = Type.getInternalName(uiComponentClass);
 
         Class<?> buttonClass = Refl.getFieldType(Refl.getFieldByInterface(ButtonAPI.class, EventsPanel.class));
 
@@ -103,6 +111,7 @@ public class UiUtil implements Opcodes {
         String uiPanelAPIDesc = Type.getDescriptor(UIPanelAPI.class);
         String eventsPanelDesc = Type.getDescriptor(EventsPanel.class);
         String baseLocationDesc = Type.getDescriptor(BaseLocation.class);
+        String tooltipDesc = Type.getDescriptor(toolTipClass);
 
         String campaignStateInternalName = Type.getInternalName(CampaignState.class);
 
@@ -436,8 +445,6 @@ public class UiUtil implements Opcodes {
         //     return ((zoomTrackerClass)zoomTracker).zoomLevelMethodName();
         // }
         {
-            String zoomLevelMethodName = getZoomLevelName(zoomTrackerClass);
-
             MethodVisitor mv = cw.visitMethod(
                 ACC_PUBLIC,
                 "getZoomLevel",
@@ -453,7 +460,7 @@ public class UiUtil implements Opcodes {
             mv.visitMethodInsn(
                 INVOKEVIRTUAL,
                 Type.getInternalName(zoomTrackerClass),
-                zoomLevelMethodName,
+                getZoomLevelName(zoomTrackerClass),
                 "()F",
                 false
             );
@@ -715,6 +722,98 @@ public class UiUtil implements Opcodes {
             mv.visitEnd();
         }
 
+        // public Object uiComponentGetTooltip(Object uiComponent) {
+        //     ((uiComponentClass)uiComponent).getTooltip();
+        // }
+        {
+            MethodVisitor mv = cw.visitMethod(
+                ACC_PUBLIC,
+                "uiComponentGetTooltip",
+                "(Ljava/lang/Object;)Ljava/lang/Object;",
+                null,
+                null
+            );
+            mv.visitCode();
+
+            mv.visitVarInsn(ALOAD, 1);
+            mv.visitTypeInsn(CHECKCAST, uiComponentInternalName);
+
+            mv.visitMethodInsn(
+                INVOKEVIRTUAL,
+                uiComponentInternalName,
+                "getTooltip",
+                "()" + tooltipDesc,
+                false
+            );
+
+            mv.visitInsn(ARETURN);
+
+            mv.visitMaxs(0, 0);
+            mv.visitEnd();
+        }
+
+        // public Object uiComponentShowTooltip(Object uiComponent, Object tooltip) {
+        //     ((uiComponentClass)uiComponent).showTooltip();
+        // }
+        {
+            MethodVisitor mv = cw.visitMethod(
+                ACC_PUBLIC,
+                "uiComponentShowTooltip",
+                "(Ljava/lang/Object;Ljava/lang/Object;)V",
+                null,
+                null
+            );
+            mv.visitCode();
+
+            mv.visitVarInsn(ALOAD, 1);
+            mv.visitTypeInsn(CHECKCAST, uiComponentInternalName);
+
+            mv.visitVarInsn(ALOAD, 2);
+            mv.visitMethodInsn(
+                INVOKEVIRTUAL,
+                uiComponentInternalName,
+                "showTooltip",
+                "(Ljava/lang/Object;)V",
+                false
+            );
+
+            mv.visitInsn(RETURN);
+
+            mv.visitMaxs(0, 0);
+            mv.visitEnd();
+        }
+
+        // public Object uiComponentHideTooltip(Object button, Object tooltip) {
+        //     ((uiComponentClass)uiComponent).hideTooltip();
+        // }
+        {
+            MethodVisitor mv = cw.visitMethod(
+                ACC_PUBLIC,
+                "uiComponentHideTooltip",
+                "(Ljava/lang/Object;Ljava/lang/Object;)V",
+                null,
+                null
+            );
+            mv.visitCode();
+
+            mv.visitVarInsn(ALOAD, 1);
+            mv.visitTypeInsn(CHECKCAST, uiComponentInternalName);
+
+            mv.visitVarInsn(ALOAD, 2);
+            mv.visitMethodInsn(
+                INVOKEVIRTUAL,
+                uiComponentInternalName,
+                "hideTooltip",
+                "(Ljava/lang/Object;)V",
+                false
+            );
+
+            mv.visitInsn(RETURN);
+
+            mv.visitMaxs(0, 0);
+            mv.visitEnd();
+        }
+
         // public List<UIComponentAPI> getChildrenNonCopy(Object uiPanel) {
         //     return ((uiPanelClass)uiPanel).getChildrenNonCopy();
         // }
@@ -759,6 +858,7 @@ public class UiUtil implements Opcodes {
             cw.toByteArray()),
             mapClass,
             uiPanelClass,
+            uiComponentClass,
             messageDisplayClass
         };
     }
@@ -766,6 +866,7 @@ public class UiUtil implements Opcodes {
     public static final UtilInterface utils;
     public static final Class<?> mapClass;
     public static final Class<?> uiPanelClass;
+    public static final Class<?> uiComponentClass;
 
     private static final VarHandle followMouseVarHandle;
     private static final VarHandle messageDisplayListVarHandle;
@@ -788,8 +889,9 @@ public class UiUtil implements Opcodes {
 
             mapClass = result[1];
             uiPanelClass = result[2];
+            uiComponentClass = result[3];
 
-            Class<?> messageDisplayClass = result[3];
+            Class<?> messageDisplayClass = result[4];
             messageDisplayListVarHandle = MethodHandles.privateLookupIn(messageDisplayClass, lookup).findVarHandle(
                 messageDisplayClass,
                 Refl.getFieldName(Refl.getFieldByType(LinkedList.class, messageDisplayClass)),
@@ -854,6 +956,16 @@ public class UiUtil implements Opcodes {
 
     public static void setAbilitySlots(AbilitySlots abilitySlots, AbilitySlot[][] slots) {
         abilitySlotsVarHandle.set(abilitySlots, slots);
+    }
+
+    public static boolean isInBounds(PositionAPI pos, float mouseX, float mouseY) {
+        float leftBound = pos.getCenterX() - pos.getWidth() / 2;
+        float rightBound = pos.getCenterX() + pos.getWidth() / 2;
+        float topBound = pos.getCenterY() - pos.getHeight() / 2;
+        float bottomBound = pos.getCenterY() + pos.getHeight() / 2;
+
+        return mouseX >= leftBound && mouseX <= rightBound &&
+               mouseY >= topBound && mouseY <= bottomBound;
     }
 
     public static void setButtonHook(ButtonAPI button, Runnable runBefore, Runnable runAfter) {
