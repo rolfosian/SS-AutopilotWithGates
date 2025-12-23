@@ -14,17 +14,19 @@ import com.fs.starfarer.api.campaign.CustomCampaignEntityAPI;
 import com.fs.starfarer.api.campaign.SectorAPI;
 import com.fs.starfarer.api.campaign.SectorEntityToken;
 import com.fs.starfarer.api.campaign.StarSystemAPI;
-import com.fs.starfarer.campaign.BaseLocation;
 
 import com.fs.starfarer.api.impl.campaign.GateEntityPlugin;
 import com.fs.starfarer.api.impl.campaign.ids.Tags;
 import com.fs.starfarer.api.impl.campaign.intel.BaseIntelPlugin;
-import com.fs.starfarer.api.impl.campaign.rulecmd.missions.GateCMD;
 
 import com.fs.starfarer.api.ui.TooltipMakerAPI;
-
+import com.fs.starfarer.api.ui.UIPanelAPI;
 import com.fs.starfarer.api.util.IntervalUtil;
 import com.fs.starfarer.api.util.Misc;
+
+import com.fs.starfarer.campaign.BaseLocation;
+import com.fs.starfarer.campaign.CampaignEngine;
+import com.fs.starfarer.campaign.CampaignUIPersistentData.AbilitySlots;
 
 import data.scripts.autopilotwithgates.util.GateFinder;
 import data.scripts.autopilotwithgates.util.Refl;
@@ -33,12 +35,16 @@ import data.scripts.autopilotwithgates.util.UiUtil;
 import com.fs.starfarer.api.campaign.comm.CommMessageAPI.MessageClickAction;
 import com.fs.starfarer.api.campaign.comm.IntelInfoPlugin;
 
+import lunalib.lunaSettings.LunaSettings;
+
 public class AutopilotWithGatesPlugin extends BaseModPlugin {
     public static AutoPilotListener listener;
 
     private Thread systemGateIteratorThread;
-    private static boolean iteratorRunning = true;
+    private static volatile boolean iteratorRunning = true;
     public static List<SystemGateData> systemGateData;
+
+    private AbilityScroller abilityScroller;
 
     private static final BaseIntelPlugin unlockedMessagePlugin = new BaseIntelPlugin() {
         @Override
@@ -153,6 +159,48 @@ public class AutopilotWithGatesPlugin extends BaseModPlugin {
                 }
             });
         }
+
+        boolean abilityScroll;
+        if (Global.getSettings().getModManager().isModEnabled("lunalib")) {
+            abilityScroll = LunaSettings.getBoolean("autopilot_with_gates", "abilityScroll");
+        } else {
+            abilityScroll = Global.getSettings().getBoolean("gateAutopilot_abilityScroll");
+        }
+
+        if (abilityScroller != null) abilityScroller.remove();
+
+        if (abilityScroll) {
+            Global.getSector().addTransientScript(new EveryFrameScript() {
+                private boolean isDone = false;
+                private int f = 0;
+    
+                @Override
+                public void advance(float arg0) {
+                    if (f++ < 11) return;
+                    
+                    Object core = UiUtil.getCore(sector.getCampaignUI(), sector.getCampaignUI().getCurrentInteractionDialog());
+                    if (core == null) return;
+
+                    UIPanelAPI abilityPanel = UiUtil.getAbilityPanel(core);
+                    if (abilityPanel == null) return;
+
+                    abilityScroller = new AbilityScroller(abilityPanel);
+    
+                    this.isDone = true;
+                    Global.getSector().removeTransientScript(this); 
+                }
+    
+                @Override
+                public boolean isDone() {
+                    return this.isDone;
+                }
+    
+                @Override
+                public boolean runWhilePaused() {
+                    return true;
+                }
+            });
+        }
     }
 
     private BaseLocation arrowRenderingLoc;
@@ -163,6 +211,16 @@ public class AutopilotWithGatesPlugin extends BaseModPlugin {
 
         this.arrowRenderingLoc = listener.getArrowRenderingLoc();
         if (this.arrowRenderingLoc != null) listener.removeArrowRenderer();
+
+        if (this.abilityScroller != null) {
+            AbilitySlots oldAbilitySlots = this.abilityScroller.getOldAbilitySlots();
+            AbilitySlots ourAbilitySlots = this.abilityScroller.getOurAbilitySlots();
+            
+            oldAbilitySlots.setCurrBarIndex(ourAbilitySlots.getCurrBarIndex());
+            oldAbilitySlots.setLocked(ourAbilitySlots.isLocked());
+
+            CampaignEngine.getInstance().getUIData().setAbilitySlots(oldAbilitySlots);
+        } 
     }
 
     @Override
@@ -173,6 +231,10 @@ public class AutopilotWithGatesPlugin extends BaseModPlugin {
         if (this.arrowRenderingLoc != null) {
             listener.addArrowRenderer(this.arrowRenderingLoc);
             this.arrowRenderingLoc = null;
+        }
+
+        if (this.abilityScroller != null)  {
+            CampaignEngine.getInstance().getUIData().setAbilitySlots(this.abilityScroller.getOurAbilitySlots());
         }
     }
 

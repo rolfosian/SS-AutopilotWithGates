@@ -2,8 +2,13 @@ package data.scripts.autopilotwithgates.util;
 
 import java.util.LinkedList;
 import java.util.List;
+
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
+import java.lang.invoke.CallSite;
+import java.lang.invoke.LambdaMetafactory;
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodType;
 
 import org.apache.log4j.Logger;
 
@@ -11,15 +16,17 @@ import com.fs.graphics.util.Fader;
 import com.fs.starfarer.api.Global;
 import com.fs.starfarer.api.campaign.CampaignUIAPI;
 import com.fs.starfarer.api.campaign.SectorEntityToken;
+import com.fs.starfarer.api.ui.ButtonAPI;
 import com.fs.starfarer.api.ui.UIComponentAPI;
 import com.fs.starfarer.api.ui.UIPanelAPI;
 import com.fs.starfarer.campaign.BaseLocation;
 import com.fs.starfarer.campaign.CampaignState;
+import com.fs.starfarer.campaign.CampaignUIPersistentData.AbilitySlot;
+import com.fs.starfarer.campaign.CampaignUIPersistentData.AbilitySlots;
 import com.fs.starfarer.campaign.comms.v2.EventsPanel;
 
 import data.scripts.autopilotwithgates.org.objectweb.asm.*;
 
-@SuppressWarnings("unchecked")
 public class UiUtil implements Opcodes {
     private static final Logger logger = Logger.getLogger(UiUtil.class);
     public static void print(Object... args) {
@@ -51,15 +58,20 @@ public class UiUtil implements Opcodes {
         public SectorEntityToken getNextStep(Object courseWidget, SectorEntityToken target);
         public Fader getInner(Object courseWidget);
         public float getPhase(Object courseWidget);
-        
+
+        public void actionPerformed(Object listener, Object inputEvent, Object uiElement);
+
+        public void buttonSetListener(Object button, Object listener);
+        public Object buttonGetListener(Object button);
+
         public List<UIComponentAPI> getChildrenNonCopy(Object uiPanel);
     }
 
-    private static Class<?>[] implementUtilInterface() throws Exception {
-        Class<?> interactionDialogClass = Refl.getFieldType(Refl.getFieldByName("encounterDialog", CampaignState.class));
-
-        Class<?> coreClass = Refl.getReturnType(Refl.getMethod("getCore", CampaignState.class));
+    // With this we can implement the above interface and generate a class at runtime to call obfuscated class methods platform agnostically without reflection overhead
+    private static Class<?>[] implementUtilInterface(Class<?> coreClass, Class<?> abilityPanelClass, Class<?> actionListenerInterface) {
         String coreClassInternalName = Type.getInternalName(coreClass);
+
+        Class<?> interactionDialogClass = Refl.getFieldType(Refl.getFieldByName("encounterDialog", CampaignState.class));
 
         Class<?> courseWidgetClass = Refl.getReturnType(Refl.getMethod("getCourseWidget", CampaignState.class));
         String courseWidgetInternalName = Type.getInternalName(courseWidgetClass);
@@ -72,6 +84,12 @@ public class UiUtil implements Opcodes {
         String mapClassInternalName = Type.getInternalName(mapClass);
 
         Class<?> uiPanelClass = mapClass.getSuperclass();
+
+        Class<?> buttonClass = Refl.getFieldType(Refl.getFieldByInterface(ButtonAPI.class, EventsPanel.class));
+
+        String buttonClassInternalName = Type.getInternalName(buttonClass);
+        String actionListenerInterfaceDesc = Type.getDescriptor(actionListenerInterface);
+        String actionListenerInterfaceInternalName = Type.getInternalName(actionListenerInterface);
 
         Class<?> intelTabClass = Refl.getReturnType(Refl.getMethod("getIntelTab", EventsPanel.class));
         Class<?> zoomTrackerClass = Refl.getReturnType(Refl.getMethod("getZoomTracker", mapClass));
@@ -113,7 +131,9 @@ public class UiUtil implements Opcodes {
         ctor.visitMaxs(0, 0);
         ctor.visitEnd();
 
-        // interactionDialogGetCore(Object)
+        // public Object interactionDialogGetCore(Object interactionDialog) {
+        //     return ((interactionDialogClass)interactionDialog).getCoreUI();
+        // }
         {
             MethodVisitor mv = cw.visitMethod(
                 ACC_PUBLIC,
@@ -142,7 +162,9 @@ public class UiUtil implements Opcodes {
             mv.visitEnd();
         }
 
-        // campaignUIgetCore(Object)
+        // public Object campaignUIgetCore(Object campaignUI) {
+        //     return ((CampaignState)campaignUI).getCore();
+        // }
         {
             MethodVisitor mv = cw.visitMethod(
                 ACC_PUBLIC,
@@ -170,7 +192,9 @@ public class UiUtil implements Opcodes {
             mv.visitEnd();
         }
 
-        // coreGetCurrentTab(Object)
+        // public UIPanelAPI coreGetCurrentTab(Object core) {
+        //     return ((coreClass)core).getCurrentTab();
+        // }
         {
             MethodVisitor mv = cw.visitMethod(
                 ACC_PUBLIC,
@@ -198,7 +222,9 @@ public class UiUtil implements Opcodes {
             mv.visitEnd();
         }
 
-        // getEventsPanel(Object intelTab)
+        // public EventsPanel getEventsPanel(Object intelTab) {
+        //     return ((intelTabClass)intelTab).getEventsPanel();
+        // }
         {
             MethodVisitor mv = cw.visitMethod(
                 ACC_PUBLIC,
@@ -226,7 +252,9 @@ public class UiUtil implements Opcodes {
             mv.visitEnd();
         }
 
-        // eventsPanelGetMap(EventsPanel)
+        // public UIPanelAPI eventsPanelGetMap(EventsPanel eventsPanel) {
+        //     return ((EventsPanel)eventsPanel).getMap();
+        // }
         {
             MethodVisitor mv = cw.visitMethod(
                 ACC_PUBLIC,
@@ -253,7 +281,9 @@ public class UiUtil implements Opcodes {
             mv.visitEnd();
         }
 
-        // mapTabGetMap(Object)
+        // public UIPanelAPI mapTabGetMap(Object mapTab) {
+        //     return ((mapTabClass)mapTab).getMap();
+        // }
         {
             MethodVisitor mv = cw.visitMethod(
                 ACC_PUBLIC,
@@ -281,7 +311,9 @@ public class UiUtil implements Opcodes {
             mv.visitEnd();
         }
 
-        // mapGetLocation(UIPanelAPI)
+        // public BaseLocation mapGetLocation(UIPanelAPI map) {
+        //     return ((mapClass)map).getLocation();
+        // }
         {
             MethodVisitor mv = cw.visitMethod(
                 ACC_PUBLIC,
@@ -310,7 +342,9 @@ public class UiUtil implements Opcodes {
             mv.visitEnd();
         }
 
-        // isRadarMode(UIPanelAPI)
+        // public boolean isRadarMode(UIPanelAPI map) {
+        //     return ((mapClass)map).isRadarMode();
+        // }
         {
             MethodVisitor mv = cw.visitMethod(
                 ACC_PUBLIC,
@@ -338,7 +372,9 @@ public class UiUtil implements Opcodes {
             mv.visitEnd();
         }
 
-        // getZoomTracker(UIPanelAPI)
+        // public Object getZoomTracker(UIPanelAPI map) {
+        //     return ((mapClass)map).getZoomTracker();
+        // }
         {
             MethodVisitor mv = cw.visitMethod(
                 ACC_PUBLIC,
@@ -366,7 +402,9 @@ public class UiUtil implements Opcodes {
             mv.visitEnd();
         }
 
-        // getFactor(UIPanelAPI)
+        // public float getFactor(UIPanelAPI map) {
+        //     return ((mapClass)map).getFactor();
+        // }
         {
             MethodVisitor mv = cw.visitMethod(
                 ACC_PUBLIC,
@@ -394,9 +432,11 @@ public class UiUtil implements Opcodes {
             mv.visitEnd();
         }
 
-        // getZoomLevel(Object zoomTracker)
+        // public float getZoomLevel(Object zoomTracker) {
+        //     return ((zoomTrackerClass)zoomTracker).zoomLevelMethodName();
+        // }
         {
-            String zoomLevelMethodName = getZoomTrackerFloatGetterName(zoomTrackerClass);
+            String zoomLevelMethodName = getZoomLevelName(zoomTrackerClass);
 
             MethodVisitor mv = cw.visitMethod(
                 ACC_PUBLIC,
@@ -424,7 +464,9 @@ public class UiUtil implements Opcodes {
             mv.visitEnd();
         }
 
-        // getMessageDisplay(Object)
+        // public Object getMessageDisplay(Object campaignUI) {
+        //     return ((CampaignState)campaignUI).getMessageDisplay();
+        // }
         {
             MethodVisitor mv = cw.visitMethod(
                 ACC_PUBLIC,
@@ -452,7 +494,9 @@ public class UiUtil implements Opcodes {
             mv.visitEnd();
         }
 
-        // getCourseWidget(Object)
+        // public Object getCourseWidget(Object campaignUI) {
+        //     return ((CampaignState)campaignUI).getCourseWidget();
+        // }
         {
             MethodVisitor mv = cw.visitMethod(
                 ACC_PUBLIC,
@@ -480,7 +524,9 @@ public class UiUtil implements Opcodes {
             mv.visitEnd();
         }
 
-        // getNextStep(Object courseWidget)
+        // public SectorEntityToken getNextStep(Object courseWidget, SectorEntityToken target) {
+        //     return ((courseWidgetClass)courseWidget).getNextStep(target);
+        // }
         {
             MethodVisitor mv = cw.visitMethod(
                 ACC_PUBLIC,
@@ -514,7 +560,9 @@ public class UiUtil implements Opcodes {
             mv.visitEnd();
         }
 
-        // getInner(Object courseWidget)
+        // public Fader getInner(Object courseWidget) {
+        //     return ((courseWidgetClass)courseWidget).getFader();
+        // }
         {
             String faderDesc = Type.getDescriptor(Fader.class);
             MethodVisitor mv = cw.visitMethod(
@@ -543,7 +591,9 @@ public class UiUtil implements Opcodes {
             mv.visitEnd();
         }
 
-        // getPhase(Object courseWidget)
+        // public float getPhase(Object courseWidget) {
+        //     return ((courseWidgetClass)courseWidget).getPhase();
+        // }
         {
             MethodVisitor mv = cw.visitMethod(
                 ACC_PUBLIC,
@@ -571,7 +621,103 @@ public class UiUtil implements Opcodes {
             mv.visitEnd();
         }
 
-        // getChildrenNonCopy(Object uiPanel)
+        // public void actionPerformed(Object listener, Object inputEvent, Object uiElement) {
+        //     ((actionListenerInterface)listener).actionPerformed(inputEvent, uiElement);
+        // }
+        {
+            MethodVisitor mv = cw.visitMethod(
+                ACC_PUBLIC,
+                "actionPerformed",
+                "(Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;)V",
+                null,
+                null
+            );
+            mv.visitCode();
+
+            mv.visitVarInsn(ALOAD, 1);
+            mv.visitTypeInsn(CHECKCAST, actionListenerInterfaceInternalName);
+
+            mv.visitVarInsn(ALOAD, 2);
+            mv.visitVarInsn(ALOAD, 3);
+
+            mv.visitMethodInsn(
+                INVOKEINTERFACE,
+                actionListenerInterfaceInternalName,
+                "actionPerformed",
+                "(Ljava/lang/Object;Ljava/lang/Object;)V",
+                true // interface method
+            );
+
+            mv.visitInsn(RETURN);
+
+            mv.visitMaxs(0, 0);
+            mv.visitEnd();
+        }
+
+        // public void buttonSetListener(Object button, Object listener) {
+        //     ((buttonClass)button).setListener(listener);
+        // }
+        {
+            MethodVisitor mv = cw.visitMethod(
+                ACC_PUBLIC,
+                "buttonSetListener",
+                "(Ljava/lang/Object;Ljava/lang/Object;)V",
+                null,
+                null
+            );
+            mv.visitCode();
+
+            mv.visitVarInsn(ALOAD, 1);
+            mv.visitTypeInsn(CHECKCAST, buttonClassInternalName);
+
+            mv.visitVarInsn(ALOAD, 2);
+            mv.visitMethodInsn(
+                INVOKEVIRTUAL,
+                buttonClassInternalName,
+                "setListener",
+                "(" + actionListenerInterfaceDesc + ")V",
+                false
+            );
+
+            mv.visitInsn(RETURN);
+
+            mv.visitMaxs(0, 0);
+            mv.visitEnd();
+        }
+
+        // public Object buttonGetListener(Object button) {
+        //     ((buttonClass)button).getListener();
+        // }
+        {
+            MethodVisitor mv = cw.visitMethod(
+                ACC_PUBLIC,
+                "buttonGetListener",
+                "(Ljava/lang/Object;)Ljava/lang/Object;",
+                null,
+                null
+            );
+            mv.visitCode();
+
+            mv.visitVarInsn(ALOAD, 1);
+            mv.visitTypeInsn(CHECKCAST, buttonClassInternalName);
+
+            mv.visitMethodInsn(
+                INVOKEVIRTUAL,
+                buttonClassInternalName,
+                "getListener",
+                "()" + actionListenerInterfaceDesc,
+                false
+            );
+
+            mv.visitInsn(ARETURN);
+
+            mv.visitMaxs(0, 0);
+            mv.visitEnd();
+        }
+
+        // public List<UIComponentAPI> getChildrenNonCopy(Object uiPanel) {
+        //     return ((uiPanelClass)uiPanel).getChildrenNonCopy();
+        // }
         {
             MethodVisitor mv = cw.visitMethod(
                 ACC_PUBLIC,
@@ -603,46 +749,84 @@ public class UiUtil implements Opcodes {
         
         String classBinaryName = "data/scripts/autopilotwithgates/util/UtilInterface".replace('/', '.');
 
-        return new Class<?>[] {(Class<?>) Refl.getMethodDeclaredAndInvokeDirectly("define", new ClassLoader(UiUtil.class.getClassLoader()) {
-            @SuppressWarnings("unused")
-            Class<?> define(byte[] b) {
-                return defineClass(classBinaryName, b, 0, b.length);
-            }
-        },
-        cw.toByteArray()),
-        mapClass,
-        uiPanelClass,
-        messageDisplayClass};
+        return new Class<?>[] {(Class<?>) Refl.getMethodDeclaredAndInvokeDirectly("define",
+            new ClassLoader(UiUtil.class.getClassLoader()) {
+                @SuppressWarnings("unused")
+                Class<?> define(byte[] b) {
+                    return defineClass(classBinaryName, b, 0, b.length);
+                }
+            },
+            cw.toByteArray()),
+            mapClass,
+            uiPanelClass,
+            messageDisplayClass
+        };
     }
 
+    public static final UtilInterface utils;
     public static final Class<?> mapClass;
     public static final Class<?> uiPanelClass;
-    public static final UtilInterface utils;
 
     private static final VarHandle followMouseVarHandle;
     private static final VarHandle messageDisplayListVarHandle;
+    private static final VarHandle coreUIAbilityPanelVarHandle;
+    private static final VarHandle abilitySlotsVarHandle;
+
+    private static final CallSite actionListenerCallSite;
 
     static {
-        try {
-            Class<?>[] result = implementUtilInterface();
+        MethodHandles.Lookup lookup = MethodHandles.lookup();
 
+        try {
+            Class<?> coreClass = Refl.getReturnType(Refl.getMethod("getCore", CampaignState.class));
+            String abilityPanelFieldName = getAbilityPanelFieldName(coreClass);
+            Class<?> abilityPanelClass = Refl.getFieldType(Refl.getFieldByName(abilityPanelFieldName, coreClass));
+            Class<?> actionListenerInterface = abilityPanelClass.getInterfaces()[0];
+
+            Class<?>[] result = implementUtilInterface(coreClass, abilityPanelClass, actionListenerInterface);
             utils = (UtilInterface) Refl.instantiateClass(result[0].getConstructors()[0]);
+
             mapClass = result[1];
             uiPanelClass = result[2];
-            Class<?> messageDisplayClass = result[3];
 
-            messageDisplayListVarHandle = MethodHandles.privateLookupIn(messageDisplayClass, MethodHandles.lookup()).findVarHandle(
+            Class<?> messageDisplayClass = result[3];
+            messageDisplayListVarHandle = MethodHandles.privateLookupIn(messageDisplayClass, lookup).findVarHandle(
                 messageDisplayClass,
                 Refl.getFieldName(Refl.getFieldByType(LinkedList.class, messageDisplayClass)),
                 LinkedList.class
             );
 
-            followMouseVarHandle = MethodHandles.privateLookupIn(CampaignState.class, MethodHandles.lookup()).findVarHandle(
+            coreUIAbilityPanelVarHandle = MethodHandles.privateLookupIn(coreClass, lookup).findVarHandle(
+                coreClass,
+                abilityPanelFieldName,
+                abilityPanelClass
+            );
+
+            followMouseVarHandle = MethodHandles.privateLookupIn(CampaignState.class, lookup).findVarHandle(
                 CampaignState.class,
                 "followMouse",
                 boolean.class
             );
 
+            abilitySlotsVarHandle = MethodHandles.privateLookupIn(AbilitySlots.class, lookup).findVarHandle(
+                AbilitySlots.class,
+                "slots",
+                AbilitySlot[][].class
+            );
+    
+            MethodType factoryType = MethodType.methodType(actionListenerInterface, ActionListenerProxy.class);
+            MethodType actualSamMethodType = MethodType.methodType(void.class, Object.class, Object.class);
+            MethodType implSignature = MethodType.methodType(void.class, Object.class, Object.class);
+            MethodHandle implementationMethodHandle = lookup.findVirtual(ActionListenerProxy.class, "actionPerformed", implSignature);
+
+            actionListenerCallSite = LambdaMetafactory.metafactory(
+                lookup,
+                "actionPerformed",
+                factoryType,
+                actualSamMethodType,
+                implementationMethodHandle,
+                actualSamMethodType
+            );
 
         } catch (Throwable e) {
             throw new RuntimeException(e);
@@ -650,11 +834,11 @@ public class UiUtil implements Opcodes {
     }
 
     public static Object getCore(Object campaignUI, Object interactionDialog) {
-        try {
-            return interactionDialog == null ? utils.campaignUIgetCore(campaignUI) : utils.interactionDialogGetCore(interactionDialog);
-        } catch (Throwable e) {
-            throw new RuntimeException(e);
-        }
+        return interactionDialog == null ? utils.campaignUIgetCore(campaignUI) : utils.interactionDialogGetCore(interactionDialog);
+    }
+
+    public static UIPanelAPI getAbilityPanel(Object coreUI) {
+        return (UIPanelAPI) coreUIAbilityPanelVarHandle.get(coreUI);
     }
 
     public static List<Object> getMessageDisplayList(CampaignUIAPI campaignUI) {
@@ -666,6 +850,58 @@ public class UiUtil implements Opcodes {
         Global.getSector().getPlayerFleet().setInteractionTarget(null);
 
         followMouseVarHandle.set(campaignUI, true);
+    }
+
+    public static void setAbilitySlots(AbilitySlots abilitySlots, AbilitySlot[][] slots) {
+        abilitySlotsVarHandle.set(abilitySlots, slots);
+    }
+
+    public static void setButtonHook(ButtonAPI button, Runnable runBefore, Runnable runAfter) {
+        Object oldListener = utils.buttonGetListener(button);
+        utils.buttonSetListener(button, new ActionListener() {
+            @Override
+            public void actionPerformed(Object inputEvent, Object uiElement) {
+                runBefore.run();
+                utils.actionPerformed(oldListener, inputEvent, uiElement);
+                runAfter.run();
+            }
+        }.getProxy());
+    }
+
+    public static abstract class ActionListener {
+        private final Object listener;
+    
+        public ActionListener() {
+            try {
+                listener = actionListenerCallSite.getTarget().invoke(new ActionListenerProxy(this));
+            } catch (Throwable e) {
+                throw new RuntimeException(e);
+            }
+        }
+    
+        public abstract void actionPerformed(Object inputEvent, Object uiElement);
+        
+        public final Object getProxy() {
+            return listener;
+        }
+    }
+
+    @FunctionalInterface
+    private static interface DummyActionListenerInterface {
+        public void actionPerformed(Object arg0, Object arg1);
+    }
+
+    private static class ActionListenerProxy implements DummyActionListenerInterface {
+        private final ActionListener proxyTriggerClassInstance;
+
+        public ActionListenerProxy(ActionListener proxyTriggerClassInstance) {
+            this.proxyTriggerClassInstance = proxyTriggerClassInstance;
+        }
+
+        @Override
+        public void actionPerformed(Object arg0, Object arg1) {
+            proxyTriggerClassInstance.actionPerformed(arg0, arg1);
+        }
     }
 
     private static int computeBufferSize(Object inputStream, Object inputStreamAvailableMethod) {
@@ -718,11 +954,39 @@ public class UiUtil implements Opcodes {
         }
     }
 
-    public static String getZoomTrackerFloatGetterName(Class<?> cls) throws Exception {
+    private static String getAbilityPanelFieldName(Class<?> coreClass) {
         Object inputStream = Refl.getMethodAndInvokeDirectly(
             "getResourceAsStream",
-            cls.getClassLoader(),
-            cls.getCanonicalName().replace(".", "/") + ".class"
+            coreClass.getClassLoader(),
+            coreClass.getCanonicalName().replace(".", "/") + ".class"
+        );
+
+        ClassReader cr = new ClassReader(readStream(inputStream));
+        final String[] foundName = {null};
+
+        cr.accept(new ClassVisitor(Opcodes.ASM9) {
+            @Override
+            public MethodVisitor visitMethod(int access, String name, String desc, String sig, String[] ex) {
+    
+                if (!desc.equals("()V") || !name.equals("showAbilityBar") || foundName[0] != null) return null;
+    
+                return new MethodVisitor(Opcodes.ASM9) {
+                    @Override
+                    public void visitFieldInsn(int opcode, String owner, String fld, String fldDesc) {
+                        if (opcode == Opcodes.GETFIELD && foundName[0] == null) foundName[0] = fld;
+                    }
+                };
+            }
+        }, 0);
+
+        return foundName[0];
+    }
+
+    private static String getZoomLevelName(Class<?> zoomTrackerClass) {
+        Object inputStream = Refl.getMethodAndInvokeDirectly(
+            "getResourceAsStream",
+            zoomTrackerClass.getClassLoader(),
+            zoomTrackerClass.getCanonicalName().replace(".", "/") + ".class"
         );
 
         ClassReader cr = new ClassReader(readStream(inputStream));

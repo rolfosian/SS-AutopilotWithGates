@@ -62,6 +62,19 @@ public class Refl {
         return null;
     }
 
+    public static Object getFieldByInterface(Class<?> interfc, Class<?> cls) {
+        try {
+            for (Object field : cls.getDeclaredFields()) {
+                if (interfc.isAssignableFrom(((Class<?>)getFieldTypeHandle.invoke(field)))) {
+                    return field;
+                }
+            }
+        } catch (Throwable e) {
+            throw new RuntimeException(e);
+        }
+        return null;
+    }
+
     public static String getFieldName(Object field) {
         try {
             return (String) getFieldNameHandle.invoke(field);
