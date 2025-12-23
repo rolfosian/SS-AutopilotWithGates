@@ -44,7 +44,8 @@ public class AutopilotWithGatesPlugin extends BaseModPlugin {
     private static volatile boolean iteratorRunning = true;
     public static List<SystemGateData> systemGateData;
 
-    private AbilityScroller abilityScroller;
+    public static AbilityScroller abilityScroller;
+    
 
     private static final BaseIntelPlugin unlockedMessagePlugin = new BaseIntelPlugin() {
         @Override
