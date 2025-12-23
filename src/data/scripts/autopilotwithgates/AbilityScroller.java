@@ -33,6 +33,10 @@ public class AbilityScroller {
 
     public void remove() {
         try {
+            this.oldAbilitySlots.setCurrBarIndex(this.ourAbilitySlots.getCurrBarIndex());
+            this.oldAbilitySlots.setLocked(this.ourAbilitySlots.isLocked());
+            CampaignEngine.getInstance().getUIData().setAbilitySlots(this.oldAbilitySlots);
+
             this.abilityPanel.removeComponent(scrollPanel);
         } catch (Throwable ignored) {
             return;
@@ -112,15 +116,23 @@ public class AbilityScroller {
         return this.scrollPanel;
     }
 
+    public void setOldAbilitySlots(AbilitySlots slots) {
+        this.oldAbilitySlots = slots;
+    }
+
     public AbilitySlots getOldAbilitySlots() {
         return this.oldAbilitySlots;
+    }
+
+    public void setOurAbilitySlots(AbilitySlotters slots) {
+        this.ourAbilitySlots = slots;
     }
 
     public AbilitySlots getOurAbilitySlots() {
         return this.ourAbilitySlots;
     }
 
-    private class AbilitySlotters extends AbilitySlots {
+    public class AbilitySlotters extends AbilitySlots {
         @Override
         public void setCurrBarIndex(int arg0) {
             super.setCurrBarIndex(arg0);
