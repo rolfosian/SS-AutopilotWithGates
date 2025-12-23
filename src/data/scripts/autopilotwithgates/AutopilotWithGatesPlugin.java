@@ -46,7 +46,6 @@ public class AutopilotWithGatesPlugin extends BaseModPlugin {
 
     public static AbilityScroller abilityScroller;
     
-
     private static final BaseIntelPlugin unlockedMessagePlugin = new BaseIntelPlugin() {
         @Override
         public String getIcon() {
@@ -213,9 +212,9 @@ public class AutopilotWithGatesPlugin extends BaseModPlugin {
         this.arrowRenderingLoc = listener.getArrowRenderingLoc();
         if (this.arrowRenderingLoc != null) listener.removeArrowRenderer();
 
-        if (this.abilityScroller != null) {
-            AbilitySlots oldAbilitySlots = this.abilityScroller.getOldAbilitySlots();
-            AbilitySlots ourAbilitySlots = this.abilityScroller.getOurAbilitySlots();
+        if (abilityScroller != null) {
+            AbilitySlots oldAbilitySlots = abilityScroller.getOldAbilitySlots();
+            AbilitySlots ourAbilitySlots = abilityScroller.getOurAbilitySlots();
             
             oldAbilitySlots.setCurrBarIndex(ourAbilitySlots.getCurrBarIndex());
             oldAbilitySlots.setLocked(ourAbilitySlots.isLocked());
@@ -234,8 +233,8 @@ public class AutopilotWithGatesPlugin extends BaseModPlugin {
             this.arrowRenderingLoc = null;
         }
 
-        if (this.abilityScroller != null)  {
-            CampaignEngine.getInstance().getUIData().setAbilitySlots(this.abilityScroller.getOurAbilitySlots());
+        if (abilityScroller != null)  {
+            CampaignEngine.getInstance().getUIData().setAbilitySlots(abilityScroller.getOurAbilitySlots());
         }
     }
 
