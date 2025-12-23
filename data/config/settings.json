@@ -1,4 +1,5 @@
 {
     "gateAutopilot_LY_DIST_TOLERANCE" : "0.2",
-    "gateAutopilot_autoJump" : false
+    "gateAutopilot_autoJump" : false,
+    "gateAutopilot_abilityBarScroll" : false 
 }

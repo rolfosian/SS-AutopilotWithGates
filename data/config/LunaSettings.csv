@@ -1,2 +1,3 @@
 fieldID,fieldName,fieldType,defaultValue,secondaryValue,fieldDescription,minValue,maxValue,tab
 autoJump,Autojump,Boolean,false,,"If true, autopilot jumps automatically when reaching gates",,,
+abilityScroll,Ability Bar Scrolling,Boolean,false,,"If true, enables mouse wheel scrolling of ability bars",,,

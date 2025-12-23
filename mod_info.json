@@ -2,7 +2,7 @@
     "id": "autopilot_with_gates",
     "name": "Autopilot with Gates",
     "author": "rolfos",
-    "version": "0.0.3b",
+    "version": "0.0.3c",
     "description": "Autopilot with Gates",
     "gameVersion": "0.98a-RC8",
     "modPlugin": "data.scripts.autopilotwithgates.AutopilotWithGatesPlugin",

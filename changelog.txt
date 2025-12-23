@@ -3,3 +3,8 @@ Version 0.0.3b
 - Mitigated random crash caused by null mapLocation
 - Fixed rare case of map course arrows not rendering on intel tab hyperspace map if player opens intel tab with interaction dialog open after user has selected an option that shows a smaller map >2 times in a row
 - Added changelog, version files
+
+Version 0.0.3c
+
+- Added mouse scrolling for campaign ability bar via ctrl+scroll with mouse over ability bar (Disabled by default, enable via LunaSettings or settings.json if lunalib isn't installed/enabled)
+- Fixed bug introduced with 0.0.3b where the course arrows would stop rendering on the intel map if the tab was opened again when it was already open
