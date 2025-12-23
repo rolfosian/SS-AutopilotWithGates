@@ -32,10 +32,6 @@ public class AbilityScroller {
 
     public void remove() {
         try {
-            this.oldAbilitySlots.setCurrBarIndex(this.ourAbilitySlots.getCurrBarIndex());
-            this.oldAbilitySlots.setLocked(this.ourAbilitySlots.isLocked());
-            CampaignEngine.getInstance().getUIData().setAbilitySlots(this.oldAbilitySlots);
-
             this.abilityPanel.removeComponent(scrollPanel);
         } catch (Throwable ignored) {
             return;
