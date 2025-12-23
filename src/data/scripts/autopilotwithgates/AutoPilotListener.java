@@ -46,7 +46,6 @@ import com.fs.starfarer.api.ui.TooltipMakerAPI;
 import com.fs.starfarer.api.ui.UIPanelAPI;
 import com.fs.starfarer.api.ui.UIComponentAPI;
 
-// import com.fs.starfarer.api.util.IntervalUtil;
 import com.fs.starfarer.api.util.Misc;
 
 import data.scripts.autopilotwithgates.util.GateAutoPilotRuleMemory;
@@ -97,22 +96,18 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
     private BaseLocation arrowRenderingLoc;
     private Color arrowColor = DARK_RED;
 
-    private final CustomPanelAPI mapTabMapArrowPanel = Global.getSettings().createCustom(0f, 0f, new MapArrowRenderer(
-        new MapGetter() {
-            @Override
-            public UIPanelAPI get() {
-                return self.mapTabMap;
-            }
+    private final CustomPanelAPI mapTabMapArrowPanel = Global.getSettings().createCustom(0f, 0f, new MapArrowRenderer() {
+        @Override
+        protected UIPanelAPI getMap() {
+            return self.mapTabMap;
         }
-    ));
-    private final CustomPanelAPI intelTabMapArrowPanel = Global.getSettings().createCustom(0f, 0f, new MapArrowRenderer(
-        new MapGetter() {
-            @Override
-            public UIPanelAPI get() {
-                return self.intelTabMap;
-            }
+    });
+    private final CustomPanelAPI intelTabMapArrowPanel = Global.getSettings().createCustom(0f, 0f, new MapArrowRenderer() {
+        @Override
+        protected UIPanelAPI getMap() {
+            return self.intelTabMap;
         }
-    ));
+    });
 
     private Map<UIPanelAPI, CustomPanelAPI> dialogMaps = new HashMap<>() {
         @Override
@@ -144,8 +139,6 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
     @Override
     public void advance(float arg0) {
         if (!this.abilityActive) return;
-        // this.interval.advance(arg0);
-        // if (!this.interval.intervalElapsed()) return;
 
         CampaignUIAPI campaignUI = Global.getSector().getCampaignUI();
         if (utils.getCourseWidget(campaignUI) == null) return;
@@ -226,12 +219,12 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                         if (child.getClass() == UiUtil.mapClass && !(child == this.mapTabMap || child == this.intelTabMap) && !dialogMaps.containsKey(child)) {
                             UIPanelAPI mape = (UIPanelAPI) child;
 
-                            CustomPanelAPI arrowPanel = Global.getSettings().createCustom(0f, 0f, new MapArrowRenderer(new MapGetter() {
+                            CustomPanelAPI arrowPanel = Global.getSettings().createCustom(0f, 0f, new MapArrowRenderer() {
                                 @Override
-                                public UIPanelAPI get() {
+                                protected UIPanelAPI getMap() {
                                     return mape;
                                 }
-                            }));
+                            });
                             
                             mape.addComponent(arrowPanel);
                             this.dialogMaps.put(mape, arrowPanel);
@@ -758,18 +751,15 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
     private UIPanelAPI intelTab;
     private UIPanelAPI intelTabMap;
 
-    private class MapArrowRenderer extends BaseCustomUIPanelPlugin {
+    private abstract class MapArrowRenderer extends BaseCustomUIPanelPlugin {
         private float mapArrowPulseValue;
-        private final MapGetter mapGetter;
 
-        public MapArrowRenderer(MapGetter mapGetter) {
-            this.mapGetter = mapGetter;
-        }
+        protected abstract UIPanelAPI getMap();
 
         @Override
         public void advance(float deltaTime) {
             if (self.entryGate == null || Global.getSector().getCampaignUI().getCurrentCourseTarget() == null) return;
-            UIPanelAPI mape = this.mapGetter.get();
+            UIPanelAPI mape = this.getMap();
 
             if (!utils.isRadarMode(mape)) {
                 Object courseWidget = utils.getCourseWidget(Global.getSector().getCampaignUI());
@@ -813,7 +803,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
         @Override
         public void render(float alphaMult) {
             if (self.entryGate == null || Global.getSector().getCampaignUI().getCurrentCourseTarget() == null) return;
-            UIPanelAPI mape = this.mapGetter.get();
+            UIPanelAPI mape = this.getMap();
 
             if (!utils.isRadarMode(mape)) {
                 Object courseWidget = utils.getCourseWidget(Global.getSector().getCampaignUI());
@@ -1039,10 +1029,6 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                 arrow.renderAtCenter(arrowX, arrowY);
             }
         }
-    }
-
-    private interface MapGetter {
-        public UIPanelAPI get();
     }
 
     private UIPanelAPI getMapFromIntelTab(Object intelTab) {
