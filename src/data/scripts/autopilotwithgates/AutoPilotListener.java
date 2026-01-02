@@ -39,7 +39,6 @@ import com.fs.starfarer.api.impl.campaign.GateEntityPlugin;
 import com.fs.starfarer.api.impl.campaign.rulecmd.missions.GateCMD;
 
 import com.fs.starfarer.api.graphics.SpriteAPI;
-import com.fs.starfarer.api.ui.ButtonAPI;
 import com.fs.starfarer.api.ui.CustomPanelAPI;
 import com.fs.starfarer.api.ui.PositionAPI;
 import com.fs.starfarer.api.ui.TooltipMakerAPI;
@@ -75,10 +74,9 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
     public static final SpriteAPI arrow = Global.getSettings().getSprite("graphics/warroom/ship_arrow.png");
     public static final SpriteAPI gateCircle = Global.getSettings().getSprite("graphics/icons/gate0.png");
 
+    private final boolean autoJump;
     private final AutoPilotListener self = this;
     private AutoPilotGatesAbility ability;
-    private final boolean autoJump;
-    // private IntervalUtil interval = new IntervalUtil(0.1f, 0.1f);
 
     private final List<Object> messageDisplayList;
 
@@ -96,39 +94,27 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
     private BaseLocation arrowRenderingLoc;
     private Color arrowColor = DARK_RED;
 
-    private UIPanelAPI mapTab;
-    private UIPanelAPI mapTabMap;
-
-    private UIPanelAPI intelTab;
-    private UIPanelAPI intelTabMap;
-    private UIPanelAPI intelTabPlanetsMap;
-
-    private final CustomPanelAPI mapTabMapArrowPanel = Global.getSettings().createCustom(0f, 0f, new MapArrowRenderer() {
+    private final Map<UIPanelAPI, CustomPanelAPI> maps = new HashMap<>() {
         @Override
-        protected UIPanelAPI getMap() {
-            return self.mapTabMap;
+        public CustomPanelAPI remove(Object key) {
+            CustomPanelAPI arrowRenderingPanel = super.remove(key);
+            ((UIPanelAPI)key).removeComponent(arrowRenderingPanel);
+            return arrowRenderingPanel;
         }
-    });
-    private final CustomPanelAPI intelTabMapArrowPanel = Global.getSettings().createCustom(0f, 0f, new MapArrowRenderer() {
-        @Override
-        protected UIPanelAPI getMap() {
-            return self.intelTabMap;
-        }
-    });
-    private final CustomPanelAPI intelTabPlanetsMapArrowPanel = Global.getSettings().createCustom(0f, 0f, new MapArrowRenderer() {
-        @Override
-        protected UIPanelAPI getMap() {
-            return self.intelTabPlanetsMap;
-        }
-    });
 
-    private Map<UIPanelAPI, CustomPanelAPI> dialogMaps = new HashMap<>() {
         @Override
         public void clear() {
             for (Map.Entry<UIPanelAPI, CustomPanelAPI> entry : this.entrySet()) {
                 entry.getKey().removeComponent(entry.getValue());
             }
             super.clear();
+        }
+
+        @Override
+        public CustomPanelAPI put(UIPanelAPI map, CustomPanelAPI isNull) {
+            CustomPanelAPI arrowRenderingPanel = Global.getSettings().createCustom(0f, 0f, new MapArrowRenderer(map));
+            map.addComponent(arrowRenderingPanel);
+            return super.put(map, arrowRenderingPanel);
         }
     };
 
@@ -158,25 +144,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
 
         SectorEntityToken ultimateTarget = campaignUI.getUltimateCourseTarget();
         if (ultimateTarget == null) {
-            if (this.mapTabMap != null) {
-                this.mapTabMap.removeComponent(this.mapTabMapArrowPanel);
-                this.mapTabMap = null;
-                this.mapTab = null;
-            }
-
-            if (this.intelTabMap != null) {
-                this.intelTabMap.removeComponent(this.intelTabMapArrowPanel);
-                this.intelTabMap = null;
-                this.intelTab = null;
-            }
-
-            if (this.intelTabPlanetsMap != null) {
-                this.intelTabPlanetsMap.removeComponent(this.intelTabPlanetsMapArrowPanel);
-                this.intelTabPlanetsMap = null;
-                this.intelTab = null;
-            }
-
-            if (!this.dialogMaps.isEmpty()) dialogMaps.clear();
+            if (!this.maps.isEmpty()) maps.clear();
 
             this.currentUltimateTarget = null;
             this.entryGate = null;
@@ -196,25 +164,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
 
         } else if (this.entryGate == null) {
             if (this.renderingArrow) removeArrowRenderer();
-            if (!this.dialogMaps.isEmpty()) this.dialogMaps.clear();
-
-            if (this.mapTabMap != null) {
-                this.mapTabMap.removeComponent(this.mapTabMapArrowPanel);
-                this.mapTabMap = null;
-                this.mapTab = null;
-            }
-
-            if (this.intelTabMap != null) {
-                this.intelTabMap.removeComponent(this.intelTabMapArrowPanel);
-                this.intelTabMap = null;
-                this.intelTab = null;
-            }
-
-            if (this.intelTabPlanetsMap != null) {
-                this.intelTabPlanetsMap.removeComponent(this.intelTabPlanetsMapArrowPanel);
-                this.intelTabPlanetsMap = null;
-                this.intelTab = null;
-            }
+            if (!this.maps.isEmpty()) this.maps.clear();
         }
         
         if (ultimateTarget == this.entryGate) {
@@ -222,165 +172,54 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                 > GateFinder.getFuelCostToUltimateTarget(playerFleet, this.currentUltimateTarget)) this.arrowColor = DARK_GREEN;
             else this.arrowColor = DARK_RED;
 
+            Object core = null;
             CoreUITabId currentCoreTabId = campaignUI.getCurrentCoreTab();
             InteractionDialogAPI interactionDialog = campaignUI.getCurrentInteractionDialog();
-            boolean dialogMapsIsEmpty = this.dialogMaps.isEmpty();
+            boolean mapsPresent = false;
 
             // there is potential for maps with course arrow functionality in interaction dialog tree (courier missions etc)
-            if (interactionDialog != null && interactionDialog.getInteractionTarget() != self.entryGate) {
-                if (this.intelTabMap != null) {
-                    this.intelTabMap.removeComponent(this.intelTabMapArrowPanel);
-                    this.intelTabMap = null;
-                    this.intelTab = null;
-
-                } else if (this.mapTabMap != null) {
-                    this.mapTabMap.removeComponent(this.mapTabMapArrowPanel);
-                    this.mapTabMap = null;
-                    this.mapTab = null;
-                }
-
-                if (this.intelTabPlanetsMap != null) {
-                    this.intelTabPlanetsMap.removeComponent(this.intelTabPlanetsMapArrowPanel);
-                    this.intelTabPlanetsMap = null;
-                    this.intelTab = null;
-                }
+            if (interactionDialog != null) {
+                core = utils.interactionDialogGetCore(interactionDialog);
 
                 for (TreeNode node : new TreeTraverser(interactionDialog).getNodes()) {
                     for (UIComponentAPI child : node.getChildren()) {
-                        if (child.getClass() == UiUtil.mapClass && !(child == this.mapTabMap || child == this.intelTabMap || child == this.intelTabPlanetsMap) && !dialogMaps.containsKey(child)) {
-                            UIPanelAPI mape = (UIPanelAPI) child;
+                        if (child.getClass() == UiUtil.mapClass) {
+                            mapsPresent = true;
 
-                            CustomPanelAPI arrowPanel = Global.getSettings().createCustom(0f, 0f, new MapArrowRenderer() {
-                                @Override
-                                protected UIPanelAPI getMap() {
-                                    return mape;
-                                }
-                            });
-                            
-                            mape.addComponent(arrowPanel);
-                            this.dialogMaps.put(mape, arrowPanel);
-                            dialogMapsIsEmpty = false;
-                        }
-                    }
-                }
-
-            } else if (!dialogMapsIsEmpty) {
-                this.dialogMaps.clear();
-            }
-            
-            if (CoreUITabId.MAP == currentCoreTabId) {
-                if (interactionDialog != null && this.mapTabMap != null) {
-                    this.mapTab = utils.coreGetCurrentTab(UiUtil.getCore(campaignUI, interactionDialog));
-                    UIPanelAPI mape = utils.mapTabGetMap(this.mapTab);
-
-                    if (mape != this.mapTabMap) {
-                        this.mapTabMap.removeComponent(this.mapTabMapArrowPanel);
-                        this.mapTabMap = mape;
-                        this.mapTabMap.addComponent(this.mapTabMapArrowPanel);
-                    }
-                }
-
-                if (this.intelTabMap != null) {
-                    this.intelTabMap.removeComponent(this.intelTabMapArrowPanel);
-                    this.intelTabMap = null;
-                    this.intelTab = null;
-                }
-
-                if (this.mapTabMap == null && dialogMapsIsEmpty) {
-                    this.mapTab = utils.coreGetCurrentTab(UiUtil.getCore(campaignUI, interactionDialog));
-
-                    this.mapTabMap = utils.mapTabGetMap(this.mapTab);
-                    this.mapTabMap.addComponent(this.mapTabMapArrowPanel);
-                }
-
-            } else if (CoreUITabId.INTEL == currentCoreTabId) {
-                if (interactionDialog != null) {
-
-                    if (this.intelTab != null) {
-                        this.intelTab = utils.coreGetCurrentTab(UiUtil.getCore(campaignUI, interactionDialog));
-                        UIPanelAPI mape = getMapFromIntelTab(this.intelTab);
-                        
-                        this.intelTabMap.removeComponent(this.intelTabMapArrowPanel);
-                        this.intelTabMap = mape;
-                        this.intelTabMap.addComponent(this.intelTabMapArrowPanel);
-
-                    } else {
-                        UIPanelAPI intTab = utils.coreGetCurrentTab(UiUtil.getCore(campaignUI, interactionDialog));
-                        UIPanelAPI intMap = getMapFromIntelTab(intTab);
-
-                        if (!this.dialogMaps.containsKey(intMap)) {
-                            this.intelTab = intTab;
-                            this.intelTabMap = intMap;
-                            this.intelTabMap.addComponent(this.intelTabMapArrowPanel);
-                        }
-                    }
-                }
-
-                if (this.mapTabMap != null) {
-                    this.mapTabMap.removeComponent(this.mapTabMapArrowPanel);
-                    this.mapTabMap = null;
-                    this.mapTab = null;
-                }
-
-                if (this.intelTabMap == null && dialogMapsIsEmpty) {
-                    this.intelTab = utils.coreGetCurrentTab(UiUtil.getCore(campaignUI, interactionDialog));
-                    this.intelTabMap = getMapFromIntelTab(this.intelTab);
-                    this.intelTabMap.addComponent(this.intelTabMapArrowPanel);
-
-                } else if (this.intelTabMap != null) {
-                    UIPanelAPI intTab = utils.coreGetCurrentTab(UiUtil.getCore(campaignUI, interactionDialog));
-                    UIPanelAPI intMap = getMapFromIntelTab(this.intelTab);
-
-                    if (intMap != this.intelTabMap || intTab != this.intelTab) {
-                        this.intelTab = intTab;
-
-                        this.intelTabMap.removeComponent(this.intelTabMapArrowPanel);
-                        this.intelTabMap = intMap;
-                        this.intelTabMap.addComponent(this.intelTabMapArrowPanel);
-                    }
-
-                    ButtonAPI planetsButton = utils.intelTabGetPlanetsButton(this.intelTab);
-                    if (planetsButton != null && planetsButton.isHighlighted()) {
-                        UIPanelAPI planetsPanel = utils.intelTabGetPlanetsPanel(this.intelTab);
-                        UIPanelAPI planetsMap = UiUtil.getIntelTabPlanetsPanelMap(planetsPanel);
-
-                        if (planetsMap != null && !dialogMaps.containsKey(planetsMap)) {
-                            if (this.intelTabPlanetsMap == null) {
-                                this.intelTabPlanetsMap = planetsMap;
-                                this.intelTabPlanetsMap.addComponent(this.intelTabPlanetsMapArrowPanel);
-
-                            } else if (this.intelTabPlanetsMap != planetsMap) {
-                                this.intelTabPlanetsMap.removeComponent(this.intelTabPlanetsMapArrowPanel);
-                                this.intelTabPlanetsMap = planetsMap;
-                                this.intelTabPlanetsMap.addComponent(this.intelTabPlanetsMapArrowPanel);
+                            if (!this.maps.containsKey(child)) {
+                                this.maps.put((UIPanelAPI) child, null);
                             }
                         }
                     }
                 }
-
             } else {
-                if (this.intelTabMap != null) {
-                    this.intelTabMap.removeComponent(this.intelTabMapArrowPanel);
-                    this.intelTabMap = null;
-                    this.intelTab = null;
-                }
+                core = utils.campaignUIgetCore(campaignUI);
+            }
 
-                if (this.mapTabMap != null) {
-                    this.mapTabMap.removeComponent(this.mapTabMapArrowPanel);
-                    this.mapTabMap = null;
-                    this.mapTab = null;
-                }
+            if (CoreUITabId.MAP == currentCoreTabId) {
+                mapsPresent = true;
+                UIPanelAPI map = utils.mapTabGetMap(utils.coreGetCurrentTab(core));
+                if (!this.maps.containsKey(map)) this.maps.put(map, null);
 
-                if (this.intelTabPlanetsMap != null) {
-                    this.intelTabPlanetsMap.removeComponent(this.intelTabPlanetsMapArrowPanel);
-                    this.intelTabPlanetsMap = null;
-                    this.intelTab = null;
+            } else if (CoreUITabId.INTEL == currentCoreTabId) {
+                mapsPresent = true;
+                UIPanelAPI intelTab = utils.coreGetCurrentTab(core);
+                UIPanelAPI map = UiUtil.getMapFromIntelTab(intelTab);
+
+                if (!this.maps.containsKey(map)) this.maps.put(map, null);
+                
+                if (utils.intelTabGetPlanetsButton(intelTab).isHighlighted()) {
+                    UIPanelAPI planetsPanel = utils.intelTabGetPlanetsPanel(intelTab);
+                    UIPanelAPI planetsMap = UiUtil.getIntelTabPlanetsPanelMap(planetsPanel);
+
+                    if (planetsMap != null && !this.maps.containsKey(planetsMap)) this.maps.put(planetsMap, null);
                 }
             }
-            
-            if (!playerFleet.isInHyperspace()) return;
-            CustomCampaignEntityAPI newEntryGate = GateFinder.getNearestGateToPlayerOutsideLocation(this.exitGate, this.currentUltimateTarget);
 
+            if (!mapsPresent) this.maps.clear();
+            if (!playerFleet.isInHyperspace()) return;
+
+            CustomCampaignEntityAPI newEntryGate = GateFinder.getNearestGateToPlayerOutsideLocation(this.exitGate, this.currentUltimateTarget);
             if (newEntryGate != null) {
                 if (this.entryGate != newEntryGate) {
                     this.entryGate = newEntryGate;
@@ -577,7 +416,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                 dialog.getPlugin().getMemoryMap().put("$gateAutoPilotRule", mem);
 
                 dialog.getOptionPanel().addOption(
-                    "Travel through the gate to " + exit.getContainingLocation().getName(),
+                    "Travel through the gate to " + exit.getName() + " in " + exit.getContainingLocation().getName(),
                     "gateAutoPilotRule"
                 );
                 dialog.getOptionPanel().addOptionTooltipAppender("gateAutoPilotRule", new OptionTooltipCreator() {
@@ -595,7 +434,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
             } else {
                 CustomCampaignEntityAPI exit = this.exitGate;
                 dialog.getOptionPanel().addOption(
-                    "Travel through the gate to " + exit.getContainingLocation().getName(),
+                    "Travel through the gate to " + exit.getName() + " in " + exit.getContainingLocation().getName(),
                     "gateAutoPilotRule"
                 );
                 dialog.getOptionPanel().addOptionTooltipAppender("gateAutoPilotRule", new OptionTooltipCreator() {
@@ -645,19 +484,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
         
         removeArrowRenderer();
 
-        if (this.intelTabMap != null) {
-            this.intelTabMap.removeComponent(this.intelTabMapArrowPanel);
-            this.intelTabMap = null;
-            this.intelTab = null;
-        }
-        
-        if (this.mapTabMap != null) {
-            this.mapTabMap.removeComponent(this.mapTabMapArrowPanel);
-            this.mapTabMap = null;
-            this.mapTab = null;
-        }
-
-        if (!this.dialogMaps.isEmpty()) this.dialogMaps.clear();
+        if (!this.maps.isEmpty()) this.maps.clear();
 
         this.wasJustGotCloserThanGate = false;
         this.entryGate = null;
@@ -701,7 +528,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
         float alphaMult = Global.getSector().getViewport().getAlphaMult();
         alphaMult *= playerFleet.getSensorFader().getBrightness();
 
-        if (!(alphaMult <= 0.0F)) {
+        if (alphaMult > 0.0F) {
             GL11.glPushMatrix();
 
             Vector2f fleetLoc = playerFleet.getLocation();
@@ -714,13 +541,13 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
             }
 
             Object courseWidget = utils.getCourseWidget(Global.getSector().getCampaignUI());
-
             SectorEntityToken nextStep = utils.getNextStep(courseWidget, this.currentUltimateTarget);
             
             if (nextStep == null) {
                 GL11.glPopMatrix();
                 return;
             }
+
             alphaMult *= utils.getInner(courseWidget).getBrightness();
 
             float arrowSize = 10.0F;
@@ -752,10 +579,9 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
             float fadeStartDistance = 0.1F;
             float fadeEndDistance = 0.25F;
 
-            for(float arrowIndex = 0.0F; arrowIndex < numArrows; ++arrowIndex) {
+            for (float arrowIndex = 0.0F; arrowIndex < numArrows; ++arrowIndex) {
                 float phase;
-                for(phase = utils.getPhase(courseWidget) + arrowIndex * (1.0F / numArrows); phase > 1.0F; --phase) {
-                }
+                for (phase = utils.getPhase(courseWidget) + arrowIndex * (1.0F / numArrows); phase > 1.0F; --phase);
 
                 float arrowAlpha = 1.0F;
                 if (phase < fadeStartDistance) {
@@ -800,68 +626,85 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
         }
     }
 
-    private abstract class MapArrowRenderer extends BaseCustomUIPanelPlugin {
-        private float mapArrowPulseValue;
+    public Map<UIPanelAPI, CustomPanelAPI> getMaps() {
+        return this.maps;
+    }
 
-        protected abstract UIPanelAPI getMap();
+    private class MapArrowRenderer extends BaseCustomUIPanelPlugin {
+        private final UIPanelAPI map;
+
+        private float regularCourseArrowOffset;
+        private float gateCourseCircleOffset;
+        private float gateCourseLastLegOffset;
+
+        public MapArrowRenderer(UIPanelAPI map) {
+            super();
+            this.map = map;
+        }
 
         @Override
         public void advance(float deltaTime) {
             if (self.entryGate == null || Global.getSector().getCampaignUI().getCurrentCourseTarget() == null) return;
-            UIPanelAPI mape = this.getMap();
 
-            if (!utils.isRadarMode(mape)) {
-                Object courseWidget = utils.getCourseWidget(Global.getSector().getCampaignUI());
-                SectorEntityToken nextStep = utils.getNextStep(courseWidget, self.currentUltimateTarget);
-                if (nextStep == null) return;
+            Object courseWidget = utils.getCourseWidget(Global.getSector().getCampaignUI());
+            SectorEntityToken nextStep = utils.getNextStep(courseWidget, self.currentUltimateTarget);
+            if (nextStep == null) return;
 
-                CampaignFleetAPI playerFleet = Global.getSector().getPlayerFleet();
+            CampaignFleetAPI playerFleet = Global.getSector().getPlayerFleet();
 
-                Vector2f playerLocation = playerFleet.getLocation();
-                Vector2f targetLocation = nextStep.getLocation();
+            Vector2f playerLocation = playerFleet.getLocation();
+            Vector2f targetLocation = nextStep.getLocation();
 
-                BaseLocation mapLoc = utils.mapGetLocation(mape);
-                LocationAPI campaignMapLocation = CampaignEngine.getInstance().getUIData().getCampaignMapLocation();
+            BaseLocation mapLoc = utils.mapGetLocation(this.map);
+            LocationAPI campaignMapLoc = CampaignEngine.getInstance().getUIData().getCampaignMapLocation();
+            boolean isHyperSpace = (mapLoc != null && mapLoc.isHyperspace()) || (campaignMapLoc != null && campaignMapLoc.isHyperspace());
 
-                if (mapLoc != nextStep.getContainingLocation()) {
-                    if (mapLoc == null || (!mapLoc.isHyperspace() ||
-                        (self.intelTab == null && campaignMapLocation != null && !campaignMapLocation.isHyperspace() && Global.getSector().getCampaignUI().getCurrentInteractionDialog() == null))) {
-                        return;
-                    }
+            if (mapLoc != nextStep.getContainingLocation()) {
+                nextStep = self.currentUltimateTarget;
 
-                    nextStep = self.currentUltimateTarget;
+                playerLocation = playerFleet.getLocationInHyperspace();
+                targetLocation = nextStep.getLocationInHyperspace();
 
-                    playerLocation = playerFleet.getLocationInHyperspace();
-                    targetLocation = nextStep.getLocationInHyperspace();
-
-                } else if (self.noExitJumpPoints && (self.intelTabMap != null || (campaignMapLocation != null && campaignMapLocation.isHyperspace()))) {
-                    playerLocation = playerFleet.getLocationInHyperspace();
-                    targetLocation = nextStep.getLocationInHyperspace();
-                }
-
-                float distance = distanceBetween(playerLocation, targetLocation);
-                if (distance < 1000.0F) {
-                    distance = 1000.0F;
-                }
-
-                for(this.mapArrowPulseValue += deltaTime * 0.1F * 10000.0F / distance; this.mapArrowPulseValue > 1.0F; --this.mapArrowPulseValue) {
-                }
+            } else if (isHyperSpace) {
+                playerLocation = playerFleet.getLocationInHyperspace();
+                targetLocation = nextStep.getLocationInHyperspace();
             }
+
+            if (isHyperSpace) {
+                advanceGateCircleOffset(deltaTime);
+                advanceGateCourseLastLegOffset(deltaTime);
+            }
+
+            float distance = distanceBetween(playerLocation, targetLocation);
+            if (distance < 1000.0F) distance = 1000.0F;
+
+            for (this.regularCourseArrowOffset += deltaTime * 0.1F * 10000.0F / distance; this.regularCourseArrowOffset > 1.0F; --this.regularCourseArrowOffset);
+        }
+
+        private void advanceGateCircleOffset(float deltaTime) {
+            float distance = distanceBetween(self.entryGate.getLocationInHyperspace(), self.exitGate.getLocationInHyperspace());
+            if (distance < 1000.0F) distance = 1000.0F;
+            for (this.gateCourseCircleOffset += deltaTime * 0.1F * 10000.0F / distance; this.gateCourseCircleOffset > 1.0F; --this.gateCourseCircleOffset);
+        }
+
+        private void advanceGateCourseLastLegOffset(float deltaTime) {
+            float distance = distanceBetween(self.exitGate.getLocationInHyperspace(), self.currentUltimateTarget.getLocationInHyperspace());
+            if (distance < 1000.0F) distance = 1000.0F;
+            for (this.gateCourseLastLegOffset += deltaTime * 0.1F * 10000.0F / distance; this.gateCourseLastLegOffset > 1.0F; --this.gateCourseLastLegOffset);
         }
 
         @Override
         public void render(float alphaMult) {
             if (self.entryGate == null || Global.getSector().getCampaignUI().getCurrentCourseTarget() == null) return;
-            UIPanelAPI mape = this.getMap();
 
-            if (!utils.isRadarMode(mape)) {
+            if (!utils.isRadarMode(this.map)) {
                 Object courseWidget = utils.getCourseWidget(Global.getSector().getCampaignUI());
                 SectorEntityToken nextStep = utils.getNextStep(courseWidget, self.currentUltimateTarget);
+                if (nextStep == null) return;
                 
-                if (nextStep.isInHyperspace() && nextStep instanceof JumpPointAPI) {
-                    JumpPointAPI jumpPoint = (JumpPointAPI)nextStep;
+                if (nextStep.isInHyperspace() && nextStep instanceof JumpPointAPI jumpPoint) {
                     if (!jumpPoint.getDestinations().isEmpty()) {
-                        SectorEntityToken destination = ((JumpPointAPI.JumpDestination)jumpPoint.getDestinations().get(0)).getDestination();
+                        SectorEntityToken destination = jumpPoint.getDestinations().get(0).getDestination();
                         if (destination != null && destination.getStarSystem() != null) {
                             nextStep = destination.getStarSystem().getHyperspaceAnchor();
                         }
@@ -869,39 +712,45 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                 }
 
                 CampaignFleetAPI playerFleet = Global.getSector().getPlayerFleet();
+                LocationAPI playerFleetContainingLoc = playerFleet.getContainingLocation();
+
+                BaseLocation mapLoc = utils.mapGetLocation(this.map);
 
                 Vector2f playerLocation = playerFleet.getLocation();
                 Vector2f targetLocation = nextStep.getLocation();
-                
-                LocationAPI campaignMapLocation = CampaignEngine.getInstance().getUIData().getCampaignMapLocation();
-                BaseLocation mapLoc = utils.mapGetLocation(mape);
 
+                Object zoomTracker = utils.getZoomTracker(this.map);
+                float maxZoomFactor = utils.getMaxZoomFactor(zoomTracker);
+                
+                boolean isHyperSpace = maxZoomFactor > 3.0f;
                 boolean shouldRenderRegularCourse = true;
-                boolean campaignMapLocationNonNull = campaignMapLocation != null;
 
                 if (mapLoc != nextStep.getContainingLocation()) {
-                    if (mapLoc == null || (!mapLoc.isHyperspace() ||
-                        (self.intelTab == null && campaignMapLocationNonNull && !campaignMapLocation.isHyperspace() && Global.getSector().getCampaignUI().getCurrentInteractionDialog() == null))) {
-                        return;
-                    }
+                    if (!isHyperSpace) return;
+                    if (self.noExitJumpPoints) shouldRenderRegularCourse = false;
 
                     nextStep = self.currentUltimateTarget;
 
                     playerLocation = playerFleet.getLocationInHyperspace();
                     targetLocation = nextStep.getLocationInHyperspace();
 
-                } else if (self.noExitJumpPoints && (self.intelTabMap != null || (campaignMapLocationNonNull && campaignMapLocation.isHyperspace()))) {
+                    
+
+                } else if (self.noExitJumpPoints && isHyperSpace) {
                     playerLocation = playerFleet.getLocationInHyperspace();
                     targetLocation = nextStep.getLocationInHyperspace();
+                    shouldRenderRegularCourse = false;
+
+                } else if (!isHyperSpace && mapLoc != playerFleetContainingLoc) {
                     shouldRenderRegularCourse = false;
                 }
 
                 float distance = distanceBetween(playerLocation, targetLocation);
-                if (!(distance < 1000.0F)) {
+                if (distance >= 1000f) {
                     float arrowSize = 10.0F;
                     float arrowSpacing = 3.0F;
 
-                    float zoomLevel = utils.getZoomLevel(utils.getZoomTracker(mape));
+                    float zoomLevel = utils.getZoomLevel(zoomTracker);
                     if (zoomLevel < 0.75F) {
                         zoomLevel = 0.75F;
                     }
@@ -914,7 +763,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                         arrowSpacing = 2.1F;
                     }
 
-                    float factor = utils.getFactor(mape);
+                    float factor = utils.getFactor(this.map);
 
                     float scaledStartX = playerLocation.x * factor;
                     float scaledStartY = playerLocation.y * factor;
@@ -924,7 +773,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
 
                     alphaMult *= 0.5F;
 
-                    PositionAPI mapPos = mape.getPosition();
+                    PositionAPI mapPos = this.map.getPosition();
 
                     GL11.glPushMatrix();
                     GL11.glTranslatef((int) mapPos.getCenterX(), (int) mapPos.getCenterY(), 0.0f);
@@ -935,7 +784,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                         scaledStartY,
                         scaledEndX,
                         scaledEndY,
-                        this.mapArrowPulseValue,
+                        this.regularCourseArrowOffset,
                         arrowSize,
                         arrowSpacing,
                         self.arrowColor,
@@ -943,15 +792,14 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                         arrow
                     );
 
-                    if ((campaignMapLocationNonNull && campaignMapLocation.isHyperspace())
-                        || mapLoc.isHyperspace()) {
+                    if (isHyperSpace) {
                         playerLocation = self.entryGate.getLocationInHyperspace();
                         targetLocation = self.exitGate.getLocationInHyperspace();
 
                         Color gateArrowColor = Misc.getBasePlayerColor();
 
                         distance = distanceBetween(playerLocation, targetLocation);
-                        if (!(distance < 1000.0F)) {
+                        if (distance >= 1000f) {
                             arrowSize = 10.0F;
                             arrowSpacing = 3.0F;
                             
@@ -974,7 +822,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                                 scaledStartY,
                                 scaledEndX,
                                 scaledEndY,
-                                this.mapArrowPulseValue,
+                                this.gateCourseCircleOffset,
                                 arrowSize,
                                 arrowSpacing,
                                 gateArrowColor,
@@ -983,8 +831,8 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                             );
                         }
 
-                        if ((self.currentUltimateTarget.isInHyperspace() && self.currentUltimateTarget instanceof JumpPointAPI
-                        && ((JumpPointAPI)self.currentUltimateTarget).getDestinationStarSystem() == self.exitGate.getContainingLocation())
+                        if ((self.currentUltimateTarget.isInHyperspace() && self.currentUltimateTarget instanceof JumpPointAPI jp
+                        && jp.getDestinationStarSystem() == self.exitGate.getContainingLocation())
                         || self.currentUltimateTarget.getContainingLocation() == self.exitGate.getContainingLocation()) {
                             GL11.glPopMatrix();
                             return;
@@ -994,7 +842,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                         targetLocation = nextStep.getLocationInHyperspace();
 
                         distance = distanceBetween(playerLocation, targetLocation);
-                        if (!(distance < 1000.0F)) {
+                        if (distance >= 1000f) {
                             arrowSize = 10.0F;
                             arrowSpacing = 3.0F;
                                 
@@ -1017,7 +865,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                                 scaledStartY,
                                 scaledEndX,
                                 scaledEndY,
-                                this.mapArrowPulseValue,
+                                this.gateCourseLastLegOffset,
                                 arrowSize,
                                 arrowSpacing,
                                 gateArrowColor,
@@ -1031,7 +879,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
             }
         }
 
-        private void renderCourseArrowOnMap(float startX, float startY, float endX, float endY, float pulseValue, float arrowSize, float arrowSpacing, Color arrowColor, float alphaMult, SpriteAPI arrow) {
+        private void renderCourseArrowOnMap(float startX, float startY, float endX, float endY, float offset, float arrowSize, float arrowSpacing, Color arrowColor, float alphaMult, SpriteAPI arrow) {
             arrow.setSize(arrowSize, arrowSize);
             arrow.setColor(arrowColor);
             arrow.setAlphaMult(alphaMult);
@@ -1052,10 +900,9 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
             float fadeStartDistance = arrowSize * 4.0F;
             float fadeEndDistance = fadeStartDistance;
             
-            for(float arrowIndex = 0.0F; arrowIndex < numArrows; ++arrowIndex) {
+            for (float arrowIndex = 0.0F; arrowIndex < numArrows; ++arrowIndex) {
                 float phase;
-                for(phase = pulseValue + arrowIndex * (1.0F / numArrows); phase > 1.0F; --phase) {
-                }
+                for (phase = offset + arrowIndex * (1.0F / numArrows); phase > 1.0F; --phase);
         
                 float distanceAlongPath = 5.0F + arrowSize + phase * distance;
                 
@@ -1078,12 +925,6 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                 arrow.renderAtCenter(arrowX, arrowY);
             }
         }
-    }
-
-    private UIPanelAPI getMapFromIntelTab(Object intelTab) {
-        EventsPanel eventsPanel = utils.getEventsPanel(intelTab);
-        Object outerMap = utils.eventsPanelGetMap(eventsPanel);
-        return utils.mapTabGetMap(outerMap);
     }
 
     private static float distanceBetween(Vector2f pos1, Vector2f pos2) {

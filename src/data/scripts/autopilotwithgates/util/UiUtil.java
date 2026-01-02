@@ -52,9 +52,12 @@ public class UiUtil implements Opcodes {
         public UIPanelAPI mapTabGetMap(Object mapTab);
 
         public BaseLocation mapGetLocation(UIPanelAPI map);
+        public UIPanelAPI mapGetMapTab(UIPanelAPI map);
         public boolean isRadarMode(UIPanelAPI map);
         public Object getZoomTracker(UIPanelAPI map);
         public float getFactor(UIPanelAPI map);
+
+        public float getMaxZoomFactor(Object zoomTracker);
         public float getZoomLevel(Object zoomTracker);
 
         public Object getMessageDisplay(Object campaignUI);
@@ -107,6 +110,7 @@ public class UiUtil implements Opcodes {
         Class<?> intelTabPlanetsPanelClass = Refl.getReturnType(Refl.getMethod("getPlanetsPanel", intelTabClass));
 
         Class<?> zoomTrackerClass = Refl.getReturnType(Refl.getMethod("getZoomTracker", mapClass));
+        String[] zoomTrackerMethodNames = getZoomTrackerMethodNames(zoomTrackerClass);
         
         String superName = Type.getType(Object.class).getInternalName();
         String interfaceName = Type.getType(UtilInterface.class).getInternalName();
@@ -528,7 +532,37 @@ public class UiUtil implements Opcodes {
             mv.visitMethodInsn(
                 INVOKEVIRTUAL,
                 Type.getInternalName(zoomTrackerClass),
-                getZoomLevelName(zoomTrackerClass),
+                zoomTrackerMethodNames[0],
+                "()F",
+                false
+            );
+
+            mv.visitInsn(FRETURN);
+
+            mv.visitMaxs(0, 0);
+            mv.visitEnd();
+        }
+
+        // public float getMaxZoomFactor(Object zoomTracker) {
+        //     return ((zoomTrackerClass)zoomTracker).getMaxZoomFactorMethodName();
+        // }
+        {
+            MethodVisitor mv = cw.visitMethod(
+                ACC_PUBLIC,
+                "getMaxZoomFactor",
+                "(Ljava/lang/Object;)F",
+                null,
+                null
+            );
+            mv.visitCode();
+
+            mv.visitVarInsn(ALOAD, 1);
+            mv.visitTypeInsn(CHECKCAST, Type.getInternalName(zoomTrackerClass));
+
+            mv.visitMethodInsn(
+                INVOKEVIRTUAL,
+                Type.getInternalName(zoomTrackerClass),
+                zoomTrackerMethodNames[1],
                 "()F",
                 false
             );
@@ -916,7 +950,7 @@ public class UiUtil implements Opcodes {
         
         String classBinaryName = "data/scripts/autopilotwithgates/util/UtilInterface".replace('/', '.');
 
-        return new Class<?>[] {(Class<?>) Refl.getMethodDeclaredAndInvokeDirectly("define",
+        return new Class<?>[] {(Class<?>)Refl.getMethodDeclaredAndInvokeDirectly("define",
             new ClassLoader(UiUtil.class.getClassLoader()) {
                 @SuppressWarnings("unused")
                 Class<?> define(byte[] b) {
@@ -952,6 +986,7 @@ public class UiUtil implements Opcodes {
         try {
             Class<?> coreClass = Refl.getReturnType(Refl.getMethod("getCore", CampaignState.class));
             String abilityPanelFieldName = getAbilityPanelFieldName(coreClass);
+
             Class<?> abilityPanelClass = Refl.getFieldType(Refl.getFieldByName(abilityPanelFieldName, coreClass));
             Class<?> actionListenerInterface = abilityPanelClass.getInterfaces()[0];
 
@@ -994,7 +1029,7 @@ public class UiUtil implements Opcodes {
                 "slots",
                 AbilitySlot[][].class
             );
-    
+            
             MethodType factoryType = MethodType.methodType(actionListenerInterface, ActionListenerProxy.class);
             MethodType actualSamMethodType = MethodType.methodType(void.class, Object.class, Object.class);
             MethodType implSignature = MethodType.methodType(void.class, Object.class, Object.class);
@@ -1018,17 +1053,23 @@ public class UiUtil implements Opcodes {
         return interactionDialog == null ? utils.campaignUIgetCore(campaignUI) : utils.interactionDialogGetCore(interactionDialog);
     }
 
-    public static UIPanelAPI getIntelTabPlanetsPanelMap(UIPanelAPI planetsPanel) {
-        Object mapParent = intelTabPlanetsPanelMapHandle.get(planetsPanel);
-        return mapParent == null ? null : utils.mapTabGetMap(mapParent);
-    }
-
     public static UIPanelAPI getAbilityPanel(Object coreUI) {
         return (UIPanelAPI) coreUIAbilityPanelVarHandle.get(coreUI);
     }
 
     public static List<Object> getMessageDisplayList(CampaignUIAPI campaignUI) {
         return (List<Object>) messageDisplayListVarHandle.get(utils.getMessageDisplay(campaignUI));
+    }
+
+    public static UIPanelAPI getMapFromIntelTab(Object intelTab) {
+        EventsPanel eventsPanel = utils.getEventsPanel(intelTab);
+        Object outerMap = utils.eventsPanelGetMap(eventsPanel);
+        return utils.mapTabGetMap(outerMap);
+    }
+
+    public static UIPanelAPI getIntelTabPlanetsPanelMap(UIPanelAPI planetsPanel) {
+        Object mapParent = intelTabPlanetsPanelMapHandle.get(planetsPanel);
+        return mapParent == null ? null : utils.mapTabGetMap(mapParent);
     }
 
     public static void setFollowMouseTrue(CampaignUIAPI campaignUI) {
@@ -1178,50 +1219,97 @@ public class UiUtil implements Opcodes {
         return foundName[0];
     }
 
-    private static String getZoomLevelName(Class<?> zoomTrackerClass) {
+    private static String[] getZoomTrackerMethodNames(Class<?> zoomTrackerClass) {
         Object inputStream = Refl.getMethodAndInvokeDirectly(
             "getResourceAsStream",
             zoomTrackerClass.getClassLoader(),
             zoomTrackerClass.getCanonicalName().replace(".", "/") + ".class"
         );
+        byte[] stream = readStream(inputStream);
+        final String[] foundNames = {null, null};
 
-        ClassReader cr = new ClassReader(readStream(inputStream));
-        final String[] foundName = {null};
+        ClassReader cr = new ClassReader(stream);
+        final String[] maxZoomFactorFieldName = {null};
 
         cr.accept(new ClassVisitor(Opcodes.ASM9) {
             @Override
             public MethodVisitor visitMethod(int access, String name, String desc, String sig, String[] ex) {
-    
                 if (!desc.equals("()F")) return null;
-    
+
                 return new MethodVisitor(Opcodes.ASM9) {
-    
                     int fieldGets = 0;
                     int fcmps = 0;
                     int fReturns = 0;
+
+                    String lastFieldName;
+                    String secondCompareField;
     
                     @Override
                     public void visitFieldInsn(int opcode, String owner, String fld, String fldDesc) {
-                        if (opcode == Opcodes.GETFIELD && fldDesc.equals("F")) fieldGets++;
+                        if (opcode == Opcodes.GETFIELD && fldDesc.equals("F")) {
+                            fieldGets++;
+                            lastFieldName = fld;
+                        }
                     }
     
                     @Override
                     public void visitInsn(int opcode) {
-                        if (opcode == Opcodes.FCMPG || opcode == Opcodes.FCMPL) fcmps++;
-                        if (opcode == Opcodes.FRETURN) fReturns++;
+                        if (opcode == Opcodes.FCMPG || opcode == Opcodes.FCMPL) {
+                            fcmps++;
+                            if (fcmps == 2) {
+                                secondCompareField = lastFieldName;
+                            }
+                        }
+                        if (opcode == Opcodes.FRETURN) {
+                            fReturns++;
+                        }
                     }
     
                     @Override
                     public void visitEnd() {
                         if (fieldGets >= 3 && fcmps >= 2 && fReturns == 1) {
-                            foundName[0] = name;
+                            foundNames[0] = name;
+                            maxZoomFactorFieldName[0] = secondCompareField;
                         }
                     }
                 };
             }
         }, 0);
 
-        return foundName[0];
+        cr.accept(new ClassVisitor(Opcodes.ASM9) {
+            @Override
+            public MethodVisitor visitMethod(int access, String name, String desc, String sig, String[] ex) {
+                if (!desc.equals("()F")) return null;
+
+                return new MethodVisitor(Opcodes.ASM9) {
+                    int fieldGets = 0;
+                    int fReturns = 0;
+
+                    @Override
+                    public void visitFieldInsn(int opcode, String owner, String fld, String fldDesc) {
+                        if (opcode == Opcodes.GETFIELD && fldDesc.equals("F") && fld.equals(maxZoomFactorFieldName[0])) {
+                            fieldGets++;
+                        }
+                    }
+
+                    @Override
+                    public void visitInsn(int opcode) {
+                        if (opcode == Opcodes.FRETURN) {
+                            fReturns++;
+                        }
+                    }
+
+                    @Override
+                    public void visitEnd() {
+                        if (fieldGets == 1 && fReturns == 1) {
+                            foundNames[1] = name;
+                        }
+                    }
+                };
+            }
+        }, 0);
+
+        return foundNames;
     }
 
     private static final int TABLE_SIZE = (int)Math.sqrt(1048576.0);

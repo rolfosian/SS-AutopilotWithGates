@@ -102,6 +102,8 @@ public class AutopilotWithGatesPlugin extends BaseModPlugin {
             systemGateData = null;
         }
 
+        if (listener != null) listener.getMaps().clear();
+
         listener = new AutoPilotListener(abilityActive);
         sector.addTransientListener(listener);
         sector.addTransientScript(listener);
