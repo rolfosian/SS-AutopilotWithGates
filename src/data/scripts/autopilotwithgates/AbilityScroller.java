@@ -2,7 +2,6 @@ package data.scripts.autopilotwithgates;
 
 import java.util.List;
 
-import com.fs.starfarer.api.GameState;
 import com.fs.starfarer.api.Global;
 import com.fs.starfarer.api.input.InputEventAPI;
 
@@ -63,8 +62,8 @@ public class AbilityScroller {
         this.abilityPanel = abilityPanel;
         this.scrollPanel = Global.getSettings().createCustom(0f, 0f, new BaseCustomUIPanelPlugin() {
 
-            private ButtonAPI prevButton = prevBtn[0];
-            private ButtonAPI nextButton = nextBtn[0];
+            private final ButtonAPI prevButton = prevBtn[0];
+            private final ButtonAPI nextButton = nextBtn[0];
 
             private boolean isInBounds(float mouseX, float mouseY) {
                 return mouseX >= leftBound && mouseX <= rightBound &&
@@ -73,8 +72,6 @@ public class AbilityScroller {
 
             @Override
             public void processInput(List<InputEventAPI> events) {
-                if (Global.getCurrentState() != GameState.CAMPAIGN) return;
-
                 for (InputEventAPI event : events) {
                     if (!event.isConsumed() && event.isMouseScrollEvent() && isInBounds(event.getX(), event.getY())) {
                         if (event.getEventValue() > 0) {
