@@ -39,7 +39,7 @@ import com.fs.starfarer.api.impl.campaign.GateEntityPlugin;
 import com.fs.starfarer.api.impl.campaign.rulecmd.missions.GateCMD;
 
 import com.fs.starfarer.api.graphics.SpriteAPI;
-
+import com.fs.starfarer.api.ui.ButtonAPI;
 import com.fs.starfarer.api.ui.CustomPanelAPI;
 import com.fs.starfarer.api.ui.PositionAPI;
 import com.fs.starfarer.api.ui.TooltipMakerAPI;
@@ -96,6 +96,13 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
     private BaseLocation arrowRenderingLoc;
     private Color arrowColor = DARK_RED;
 
+    private UIPanelAPI mapTab;
+    private UIPanelAPI mapTabMap;
+
+    private UIPanelAPI intelTab;
+    private UIPanelAPI intelTabMap;
+    private UIPanelAPI intelTabPlanetsMap;
+
     private final CustomPanelAPI mapTabMapArrowPanel = Global.getSettings().createCustom(0f, 0f, new MapArrowRenderer() {
         @Override
         protected UIPanelAPI getMap() {
@@ -106,6 +113,12 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
         @Override
         protected UIPanelAPI getMap() {
             return self.intelTabMap;
+        }
+    });
+    private final CustomPanelAPI intelTabPlanetsMapArrowPanel = Global.getSettings().createCustom(0f, 0f, new MapArrowRenderer() {
+        @Override
+        protected UIPanelAPI getMap() {
+            return self.intelTabPlanetsMap;
         }
     });
 
@@ -157,6 +170,12 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                 this.intelTab = null;
             }
 
+            if (this.intelTabPlanetsMap != null) {
+                this.intelTabPlanetsMap.removeComponent(this.intelTabPlanetsMapArrowPanel);
+                this.intelTabPlanetsMap = null;
+                this.intelTab = null;
+            }
+
             if (!this.dialogMaps.isEmpty()) dialogMaps.clear();
 
             this.currentUltimateTarget = null;
@@ -190,6 +209,12 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                 this.intelTabMap = null;
                 this.intelTab = null;
             }
+
+            if (this.intelTabPlanetsMap != null) {
+                this.intelTabPlanetsMap.removeComponent(this.intelTabPlanetsMapArrowPanel);
+                this.intelTabPlanetsMap = null;
+                this.intelTab = null;
+            }
         }
         
         if (ultimateTarget == this.entryGate) {
@@ -214,9 +239,15 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                     this.mapTab = null;
                 }
 
+                if (this.intelTabPlanetsMap != null) {
+                    this.intelTabPlanetsMap.removeComponent(this.intelTabPlanetsMapArrowPanel);
+                    this.intelTabPlanetsMap = null;
+                    this.intelTab = null;
+                }
+
                 for (TreeNode node : new TreeTraverser(interactionDialog).getNodes()) {
                     for (UIComponentAPI child : node.getChildren()) {
-                        if (child.getClass() == UiUtil.mapClass && !(child == this.mapTabMap || child == this.intelTabMap) && !dialogMaps.containsKey(child)) {
+                        if (child.getClass() == UiUtil.mapClass && !(child == this.mapTabMap || child == this.intelTabMap || child == this.intelTabPlanetsMap) && !dialogMaps.containsKey(child)) {
                             UIPanelAPI mape = (UIPanelAPI) child;
 
                             CustomPanelAPI arrowPanel = Global.getSettings().createCustom(0f, 0f, new MapArrowRenderer() {
@@ -307,6 +338,24 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                         this.intelTabMap = intMap;
                         this.intelTabMap.addComponent(this.intelTabMapArrowPanel);
                     }
+
+                    ButtonAPI planetsButton = utils.intelTabGetPlanetsButton(this.intelTab);
+                    if (planetsButton != null && planetsButton.isHighlighted()) {
+                        UIPanelAPI planetsPanel = utils.intelTabGetPlanetsPanel(this.intelTab);
+                        UIPanelAPI planetsMap = UiUtil.getIntelTabPlanetsPanelMap(planetsPanel);
+
+                        if (planetsMap != null && !dialogMaps.containsKey(planetsMap)) {
+                            if (this.intelTabPlanetsMap == null) {
+                                this.intelTabPlanetsMap = planetsMap;
+                                this.intelTabPlanetsMap.addComponent(this.intelTabPlanetsMapArrowPanel);
+
+                            } else if (this.intelTabPlanetsMap != planetsMap) {
+                                this.intelTabPlanetsMap.removeComponent(this.intelTabPlanetsMapArrowPanel);
+                                this.intelTabPlanetsMap = planetsMap;
+                                this.intelTabPlanetsMap.addComponent(this.intelTabPlanetsMapArrowPanel);
+                            }
+                        }
+                    }
                 }
 
             } else {
@@ -316,10 +365,16 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                     this.intelTab = null;
                 }
 
-                 if (this.mapTabMap != null) {
+                if (this.mapTabMap != null) {
                     this.mapTabMap.removeComponent(this.mapTabMapArrowPanel);
                     this.mapTabMap = null;
                     this.mapTab = null;
+                }
+
+                if (this.intelTabPlanetsMap != null) {
+                    this.intelTabPlanetsMap.removeComponent(this.intelTabPlanetsMapArrowPanel);
+                    this.intelTabPlanetsMap = null;
+                    this.intelTab = null;
                 }
             }
             
@@ -744,12 +799,6 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
             this.arrowRenderingLoc = null;
         }
     }
-
-    private UIPanelAPI mapTab;
-    private UIPanelAPI mapTabMap;
-
-    private UIPanelAPI intelTab;
-    private UIPanelAPI intelTabMap;
 
     private abstract class MapArrowRenderer extends BaseCustomUIPanelPlugin {
         private float mapArrowPulseValue;

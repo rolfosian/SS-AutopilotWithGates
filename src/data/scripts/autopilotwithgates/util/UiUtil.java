@@ -45,6 +45,9 @@ public class UiUtil implements Opcodes {
         public UIPanelAPI coreGetCurrentTab(Object core);
 
         public EventsPanel getEventsPanel(Object intelTab);
+        public ButtonAPI intelTabGetPlanetsButton(Object intelTab);
+        public UIPanelAPI intelTabGetPlanetsPanel(Object intelTab);
+
         public UIPanelAPI eventsPanelGetMap(EventsPanel eventsPanel);
         public UIPanelAPI mapTabGetMap(Object mapTab);
 
@@ -100,6 +103,9 @@ public class UiUtil implements Opcodes {
         String actionListenerInterfaceInternalName = Type.getInternalName(actionListenerInterface);
 
         Class<?> intelTabClass = Refl.getReturnType(Refl.getMethod("getIntelTab", EventsPanel.class));
+        String intelTabInternalName = Type.getInternalName(intelTabClass);
+        Class<?> intelTabPlanetsPanelClass = Refl.getReturnType(Refl.getMethod("getPlanetsPanel", intelTabClass));
+
         Class<?> zoomTrackerClass = Refl.getReturnType(Refl.getMethod("getZoomTracker", mapClass));
         
         String superName = Type.getType(Object.class).getInternalName();
@@ -109,6 +115,8 @@ public class UiUtil implements Opcodes {
         String mapTabDesc = Type.getDescriptor(mapTabClass);
         String sectorEntityTokenDesc = Type.getDescriptor(SectorEntityToken.class);
         String uiPanelAPIDesc = Type.getDescriptor(UIPanelAPI.class);
+        String buttonAPIDesc = Type.getDescriptor(ButtonAPI.class);
+        String buttonClassDesc = Type.getDescriptor(buttonClass);
         String eventsPanelDesc = Type.getDescriptor(EventsPanel.class);
         String baseLocationDesc = Type.getDescriptor(BaseLocation.class);
         String tooltipDesc = Type.getDescriptor(toolTipClass);
@@ -222,6 +230,66 @@ public class UiUtil implements Opcodes {
                 coreClassInternalName,
                 "getCurrentTab",
                 "()" + Type.getDescriptor(uiPanelClass),
+                false
+            );
+
+            mv.visitInsn(ARETURN);
+
+            mv.visitMaxs(0, 0);
+            mv.visitEnd();
+        }
+
+        // public UIPanelAPI intelTabGetPlanetsPanel(Object intelTab) {
+        //     return ((intelTabClass)intelTab).getPlanetsPanel();
+        // }
+        {   
+            MethodVisitor mv = cw.visitMethod(
+                ACC_PUBLIC,
+                "intelTabGetPlanetsPanel",
+                "(Ljava/lang/Object;)" + uiPanelAPIDesc,
+                null,
+                null
+            );
+            mv.visitCode();
+
+            mv.visitVarInsn(ALOAD, 1);
+            mv.visitTypeInsn(CHECKCAST, intelTabInternalName);
+
+            mv.visitMethodInsn(
+                INVOKEVIRTUAL,
+                intelTabInternalName,
+                "getPlanetsPanel",
+                "()" + Type.getDescriptor(intelTabPlanetsPanelClass),
+                false
+            );
+
+            mv.visitInsn(ARETURN);
+
+            mv.visitMaxs(0, 0);
+            mv.visitEnd();
+        }
+
+        // public ButtonAPI intelTabGetPlanetsButton(Object intelTab) {
+        //     return ((intelTabClass)intelTab).getPlanetsButton();
+        // }
+        {   
+            MethodVisitor mv = cw.visitMethod(
+                ACC_PUBLIC,
+                "intelTabGetPlanetsButton",
+                "(Ljava/lang/Object;)" + buttonAPIDesc,
+                null,
+                null
+            );
+            mv.visitCode();
+
+            mv.visitVarInsn(ALOAD, 1);
+            mv.visitTypeInsn(CHECKCAST, intelTabInternalName);
+
+            mv.visitMethodInsn(
+                INVOKEVIRTUAL,
+                intelTabInternalName,
+                "getPlanetsButton",
+                "()" + buttonClassDesc,
                 false
             );
 
@@ -859,7 +927,9 @@ public class UiUtil implements Opcodes {
             mapClass,
             uiPanelClass,
             uiComponentClass,
-            messageDisplayClass
+            messageDisplayClass,
+            intelTabPlanetsPanelClass,
+            mapTabClass
         };
     }
 
@@ -872,6 +942,7 @@ public class UiUtil implements Opcodes {
     private static final VarHandle messageDisplayListVarHandle;
     private static final VarHandle coreUIAbilityPanelVarHandle;
     private static final VarHandle abilitySlotsVarHandle;
+    private static final VarHandle intelTabPlanetsPanelMapHandle;
 
     private static final CallSite actionListenerCallSite;
 
@@ -896,6 +967,14 @@ public class UiUtil implements Opcodes {
                 messageDisplayClass,
                 Refl.getFieldName(Refl.getFieldByType(LinkedList.class, messageDisplayClass)),
                 LinkedList.class
+            );
+
+            Class<?> intelTabPlanetsPanelClass = result[5];
+            Class<?> mapTabClass = result[6];
+            intelTabPlanetsPanelMapHandle = MethodHandles.privateLookupIn(intelTabPlanetsPanelClass, lookup).findVarHandle(
+                intelTabPlanetsPanelClass,
+                Refl.getFieldName(Refl.getFieldByType(mapTabClass, intelTabPlanetsPanelClass)),
+                mapTabClass
             );
 
             coreUIAbilityPanelVarHandle = MethodHandles.privateLookupIn(coreClass, lookup).findVarHandle(
@@ -937,6 +1016,11 @@ public class UiUtil implements Opcodes {
 
     public static Object getCore(Object campaignUI, Object interactionDialog) {
         return interactionDialog == null ? utils.campaignUIgetCore(campaignUI) : utils.interactionDialogGetCore(interactionDialog);
+    }
+
+    public static UIPanelAPI getIntelTabPlanetsPanelMap(UIPanelAPI planetsPanel) {
+        Object mapParent = intelTabPlanetsPanelMapHandle.get(planetsPanel);
+        return mapParent == null ? null : utils.mapTabGetMap(mapParent);
     }
 
     public static UIPanelAPI getAbilityPanel(Object coreUI) {
