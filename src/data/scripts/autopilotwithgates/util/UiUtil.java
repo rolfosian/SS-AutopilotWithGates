@@ -94,6 +94,7 @@ public class UiUtil implements Opcodes {
         Class<?> messageDisplayClass = Refl.getFieldType(Refl.getFieldByName("messageDisplay", CampaignState.class));
 
         Class<?> mapTabClass = Refl.getReturnType(Refl.getMethod("getMap", EventsPanel.class));
+        String mapTabInternalName = Type.getInternalName(mapTabClass);
 
         Class<?> mapClass = Refl.getReturnType(Refl.getMethod("getMap", mapTabClass));
         String mapClassInternalName = Type.getInternalName(mapClass);
@@ -380,11 +381,11 @@ public class UiUtil implements Opcodes {
             mv.visitCode();
 
             mv.visitVarInsn(ALOAD, 1);
-            mv.visitTypeInsn(CHECKCAST, Type.getInternalName(mapTabClass));
+            mv.visitTypeInsn(CHECKCAST, mapTabInternalName);
 
             mv.visitMethodInsn(
                 INVOKEVIRTUAL,
-                Type.getInternalName(mapTabClass),
+                mapTabInternalName,
                 "getMap",
                 "()" + Type.getDescriptor(mapClass),
                 false
