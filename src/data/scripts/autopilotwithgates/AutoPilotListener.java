@@ -672,7 +672,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
             for (this.gateCourseLastLegOffset += deltaTime * 0.1F * 10000.0F / distance; this.gateCourseLastLegOffset > 1.0F; --this.gateCourseLastLegOffset);
         }
 
-        @Override
+        @Override // i wish the hyperspace and system maps used distinct classes but here we are
         public void render(float alphaMult) {
             if (self.entryGate == null || Global.getSector().getCampaignUI().getCurrentCourseTarget() == null) return;
 
@@ -688,26 +688,23 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
             
             boolean isHyperSpace = maxZoomFactor > 3.0f;
             boolean shouldRenderRegularCourse = true;
-            
-            if (nextStep.isInHyperspace() && nextStep instanceof JumpPointAPI jumpPoint) {
-                boolean found = false;
-                if (self.currentUltimateTarget.isInHyperspace() && self.currentUltimateTarget instanceof JumpPointAPI jp) {
-                    if (!jp.getDestinations().isEmpty()) {
-                        SectorEntityToken destination = jp.getDestinations().get(0).getDestination();
-                        if (destination != null && destination.getStarSystem() != null) {
-                            if (destination.isStar()) {
-                                found = true;
-                                nextStep = self.currentUltimateTarget;
-                            }
-                        }
+
+            boolean isStar = false;
+            if (self.currentUltimateTarget.isInHyperspace() && self.currentUltimateTarget instanceof JumpPointAPI jumpPoint && !jumpPoint.getDestinations().isEmpty()) {
+                SectorEntityToken destination = jumpPoint.getDestinations().get(0).getDestination();
+                if (destination != null && destination.getStarSystem() != null) {
+                    if (destination.isStar()) {
+                        isStar = true;
+                        nextStep = self.currentUltimateTarget;
                     }
                 }
-
-                if (!found && !jumpPoint.getDestinations().isEmpty()) {
-                    SectorEntityToken destination = jumpPoint.getDestinations().get(0).getDestination();
-                    if (destination != null && destination.getStarSystem() != null) {
-                        nextStep = destination.getStarSystem().getHyperspaceAnchor();
-                    }
+                
+            }
+            
+            if (!isStar && nextStep.isInHyperspace() && nextStep instanceof JumpPointAPI jumpPoint && !jumpPoint.getDestinations().isEmpty()) {
+                SectorEntityToken destination = jumpPoint.getDestinations().get(0).getDestination();
+                if (destination != null && destination.getStarSystem() != null) {
+                    nextStep = destination.getStarSystem().getHyperspaceAnchor();
                 }
             }
 
@@ -723,7 +720,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                 playerLocation = playerFleet.getLocationInHyperspace();
                 targetLocation = self.currentUltimateTarget.getLocationInHyperspace();
 
-            } else if (self.noExitJumpPoints  && isHyperSpace) {
+            } else if (self.noExitJumpPoints && isHyperSpace) {
                 playerLocation = playerFleet.getLocationInHyperspace();
                 
                 targetLocation = self.currentUltimateTarget.getLocationInHyperspace();
@@ -731,6 +728,10 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
 
             } else if (!isHyperSpace && mapLoc != playerFleetContainingLoc) {
                 shouldRenderRegularCourse = false;
+
+            } else if (isHyperSpace && playerLocation != playerFleet.getLocationInHyperspace()) {
+                playerLocation = playerFleet.getLocationInHyperspace();
+                targetLocation = self.currentUltimateTarget.getLocationInHyperspace();
             }
 
             PositionAPI mapPos = this.map.getPosition();
@@ -824,7 +825,8 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
 
                 if ((self.currentUltimateTarget.isInHyperspace() && self.currentUltimateTarget instanceof JumpPointAPI jp
                 && jp.getDestinationStarSystem() == self.exitGate.getContainingLocation())
-                || self.currentUltimateTarget.getContainingLocation() == self.exitGate.getContainingLocation()) {
+                || self.currentUltimateTarget.getContainingLocation() == self.exitGate.getContainingLocation()
+                || self.exitGate.getContainingLocation().getJumpPoints().size() == 0) {
                     GL11.glPopMatrix();
                     return;
                 }
