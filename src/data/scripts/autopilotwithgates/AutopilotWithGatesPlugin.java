@@ -14,15 +14,13 @@ import com.fs.starfarer.api.campaign.CustomCampaignEntityAPI;
 import com.fs.starfarer.api.campaign.SectorAPI;
 import com.fs.starfarer.api.campaign.SectorEntityToken;
 import com.fs.starfarer.api.campaign.StarSystemAPI;
+import com.fs.starfarer.api.campaign.comm.CommMessageAPI.MessageClickAction;
 
 import com.fs.starfarer.api.impl.campaign.GateEntityPlugin;
 import com.fs.starfarer.api.impl.campaign.ids.Tags;
-import com.fs.starfarer.api.impl.campaign.intel.BaseIntelPlugin;
 
-import com.fs.starfarer.api.ui.TooltipMakerAPI;
 import com.fs.starfarer.api.ui.UIPanelAPI;
 import com.fs.starfarer.api.util.IntervalUtil;
-import com.fs.starfarer.api.util.Misc;
 
 import com.fs.starfarer.campaign.BaseLocation;
 import com.fs.starfarer.campaign.CampaignEngine;
@@ -32,8 +30,6 @@ import data.scripts.autopilotwithgates.util.GateFinder;
 import data.scripts.autopilotwithgates.util.Refl;
 import data.scripts.autopilotwithgates.util.UiUtil;
 
-import com.fs.starfarer.api.campaign.comm.CommMessageAPI.MessageClickAction;
-import com.fs.starfarer.api.campaign.comm.IntelInfoPlugin;
 
 import lunalib.lunaSettings.LunaSettings;
 
@@ -45,22 +41,6 @@ public class AutopilotWithGatesPlugin extends BaseModPlugin {
     public static List<SystemGateData> systemGateData;
 
     public static AbilityScroller abilityScroller;
-    
-    private static final BaseIntelPlugin unlockedMessagePlugin = new BaseIntelPlugin() {
-        @Override
-        public String getIcon() {
-            return "graphics/icons/missions/at_the_gates.png";
-        }
-        @Override
-        public boolean isHidden() {
-            return false;
-        }
-        @Override
-        public void createIntelInfo(TooltipMakerAPI info, IntelInfoPlugin.ListInfoMode mode) {
-            info.setParaFontColor(Misc.getBrightPlayerColor());
-            info.addPara("Autopilot With Gates ability unlocked", 0f);
-        }
-    };
 
     @Override
     public void onApplicationLoad() {
@@ -102,7 +82,7 @@ public class AutopilotWithGatesPlugin extends BaseModPlugin {
             systemGateData = null;
         }
 
-        if (listener != null) listener.getMaps().clear();
+        if (listener != null && !listener.getMaps().isEmpty()) listener.getMaps().clear();
 
         listener = new AutoPilotListener(abilityActive);
         sector.addTransientListener(listener);
@@ -116,7 +96,7 @@ public class AutopilotWithGatesPlugin extends BaseModPlugin {
                 playerFleet.addAbility("AutoPilotWithGates");
                 listener.setAbility((AutoPilotGatesAbility) Global.getSector().getPlayerFleet().getAbility("AutoPilotWithGates"));
 
-                sector.getCampaignUI().addMessage(unlockedMessagePlugin, MessageClickAction.NOTHING);
+                sector.getCampaignUI().addMessage(UiUtil.unlockedMessagePlugin, MessageClickAction.NOTHING);
 
             } else if (listener.getAbility() == null) {
                 listener.setAbility((AutoPilotGatesAbility) Global.getSector().getPlayerFleet().getAbility("AutoPilotWithGates"));
@@ -143,7 +123,7 @@ public class AutopilotWithGatesPlugin extends BaseModPlugin {
 
                         registerGateIterator();
 
-                        Global.getSector().getCampaignUI().addMessage(unlockedMessagePlugin, MessageClickAction.NOTHING);
+                        Global.getSector().getCampaignUI().addMessage(UiUtil.unlockedMessagePlugin, MessageClickAction.NOTHING);
 
                         isDone = true;
                         Global.getSector().removeTransientScript(this);

@@ -16,10 +16,14 @@ import com.fs.graphics.util.Fader;
 import com.fs.starfarer.api.Global;
 import com.fs.starfarer.api.campaign.CampaignUIAPI;
 import com.fs.starfarer.api.campaign.SectorEntityToken;
+import com.fs.starfarer.api.campaign.comm.IntelInfoPlugin;
+import com.fs.starfarer.api.impl.campaign.intel.BaseIntelPlugin;
 import com.fs.starfarer.api.ui.ButtonAPI;
 import com.fs.starfarer.api.ui.PositionAPI;
+import com.fs.starfarer.api.ui.TooltipMakerAPI;
 import com.fs.starfarer.api.ui.UIComponentAPI;
 import com.fs.starfarer.api.ui.UIPanelAPI;
+import com.fs.starfarer.api.util.Misc;
 import com.fs.starfarer.campaign.BaseLocation;
 import com.fs.starfarer.campaign.CampaignState;
 import com.fs.starfarer.campaign.CampaignUIPersistentData.AbilitySlot;
@@ -1093,6 +1097,38 @@ public class UiUtil implements Opcodes {
                mouseY >= topBound && mouseY <= bottomBound;
     }
 
+    public static final BaseIntelPlugin unlockedMessagePlugin = new BaseIntelPlugin() {
+        @Override
+        public String getIcon() {
+            return "graphics/icons/missions/at_the_gates.png";
+        }
+        @Override
+        public boolean isHidden() {
+            return false;
+        }
+        @Override
+        public void createIntelInfo(TooltipMakerAPI info, IntelInfoPlugin.ListInfoMode mode) {
+            info.setParaFontColor(Misc.getBrightPlayerColor());
+            info.addPara("Autopilot With Gates ability unlocked", 0f);
+        }
+    };
+
+    public static final BaseIntelPlugin disabledMessagePlugin = new BaseIntelPlugin() {
+        @Override
+        public String getIcon() {
+            return "graphics/icons/missions/at_the_gates.png";
+        }
+        @Override
+        public boolean isHidden() {
+            return false;
+        }
+        @Override
+        public void createIntelInfo(TooltipMakerAPI info, IntelInfoPlugin.ListInfoMode mode) {
+            info.setParaFontColor(Misc.getBrightPlayerColor());
+            info.addPara("Autopilot gate jump was aborted. Autopilot With Gates ability disabled.", 0f);
+        }
+    };
+
     public static void setButtonHook(ButtonAPI button, Runnable runBefore, Runnable runAfter) {
         Object oldListener = utils.buttonGetListener(button);
         utils.buttonSetListener(button, new ActionListener() {
@@ -1219,6 +1255,8 @@ public class UiUtil implements Opcodes {
         return foundName[0];
     }
 
+    // private static String get
+
     private static String[] getZoomTrackerMethodNames(Class<?> zoomTrackerClass) {
         Object inputStream = Refl.getMethodAndInvokeDirectly(
             "getResourceAsStream",
@@ -1279,14 +1317,22 @@ public class UiUtil implements Opcodes {
         cr.accept(new ClassVisitor(Opcodes.ASM9) {
             @Override
             public MethodVisitor visitMethod(int access, String name, String desc, String sig, String[] ex) {
-                if (!desc.equals("()F")) return null;
+                if (!desc.equals("()F") || access != ACC_PUBLIC) return null;
 
                 return new MethodVisitor(Opcodes.ASM9) {
                     int fieldGets = 0;
                     int fReturns = 0;
+                    int visitFieldInsns = 0;
+                    int visitMethodInsns = 0;
+
+                    @Override
+                    public void visitMethodInsn(int opcode, String owner, String name, String descriptor, boolean isInterface) {
+                        visitMethodInsns++;
+                    }
 
                     @Override
                     public void visitFieldInsn(int opcode, String owner, String fld, String fldDesc) {
+                        visitFieldInsns++;
                         if (opcode == Opcodes.GETFIELD && fldDesc.equals("F") && fld.equals(maxZoomFactorFieldName[0])) {
                             fieldGets++;
                         }
@@ -1301,7 +1347,7 @@ public class UiUtil implements Opcodes {
 
                     @Override
                     public void visitEnd() {
-                        if (fieldGets == 1 && fReturns == 1) {
+                        if (fieldGets == 1 && fReturns == 1 && visitFieldInsns == 1 & visitMethodInsns == 0) {
                             foundNames[1] = name;
                         }
                     }
@@ -1329,7 +1375,7 @@ public class UiUtil implements Opcodes {
         }
     }
 
-    public static final float fastAtan2(float y, float x) {
+    public static final float atan2(float y, float x) {
         float angleOffset;
         float signMultiplier;
     
