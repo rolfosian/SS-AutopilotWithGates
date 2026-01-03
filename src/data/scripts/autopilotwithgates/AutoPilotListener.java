@@ -39,6 +39,7 @@ import com.fs.starfarer.api.impl.campaign.GateEntityPlugin;
 import com.fs.starfarer.api.impl.campaign.rulecmd.missions.GateCMD;
 
 import com.fs.starfarer.api.graphics.SpriteAPI;
+import com.fs.starfarer.api.ui.ButtonAPI;
 import com.fs.starfarer.api.ui.CustomPanelAPI;
 import com.fs.starfarer.api.ui.PositionAPI;
 import com.fs.starfarer.api.ui.TooltipMakerAPI;
@@ -186,7 +187,8 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
 
                 if (!this.maps.containsKey(map)) this.maps.add(map);
                 
-                if (utils.intelTabGetPlanetsButton(intelTab).isHighlighted()) {
+                ButtonAPI planetsButton = utils.intelTabGetPlanetsButton(intelTab);
+                if (planetsButton != null && planetsButton.isHighlighted()) {
                     UIPanelAPI planetsPanel = utils.intelTabGetPlanetsPanel(intelTab);
                     UIPanelAPI planetsMap = UiUtil.getIntelTabPlanetsPanelMap(planetsPanel);
 
@@ -194,7 +196,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                 }
             }
 
-            if (!mapsPresent) this.maps.clear();
+            if (!mapsPresent && !this.maps.isEmpty()) this.maps.clear();
             if (!playerFleet.isInHyperspace()) return;
 
             CustomCampaignEntityAPI newEntryGate = GateFinder.getNearestGateToPlayerOutsideLocation(this.exitGate, this.currentUltimateTarget);
@@ -318,7 +320,8 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                             @Override
                             public void advance(float arg0) {
                                 if (Global.getSector().getPlayerFleet().getContainingLocation() != exit.getContainingLocation()) return;
-
+                                
+                                self.reportFleetJumped(Global.getSector().getPlayerFleet(), entry, dest);
                                 self.layInCourseFor(ultimateTarget);
 
                                 this.isDone = true;
