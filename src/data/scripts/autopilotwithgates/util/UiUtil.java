@@ -79,7 +79,9 @@ public class UiUtil implements Opcodes {
         public void uiComponentShowTooltip(Object uiComponent, Object tooltip);
         public void uiComponentHideTooltip(Object uiComponent, Object tooltip);
 
-        public List<UIComponentAPI> getChildrenNonCopy(Object uiPanel);
+        public List<UIComponentAPI> getChildrenNonCopy(UIPanelAPI uiPanel);
+        public List<UIComponentAPI> getChildrenNonCopy(UIComponentAPI parent); // custom method with instanceof check uiPanelClass else return null
+
     }
 
     // With this we can implement the above interface and generate a class at runtime to call obfuscated class methods platform agnostically without reflection overhead
@@ -102,6 +104,7 @@ public class UiUtil implements Opcodes {
         Class<?> uiPanelClass = mapClass.getSuperclass();
         Class<?> uiComponentClass = uiPanelClass.getSuperclass();
         Class<?> toolTipClass = Refl.getReturnType(Refl.getMethod("getTooltip", uiComponentClass));
+        String uiPanelInternalName = Type.getInternalName(uiPanelClass);
         String uiComponentInternalName = Type.getInternalName(uiComponentClass);
 
         Class<?> buttonClass = Refl.getFieldType(Refl.getFieldByInterface(ButtonAPI.class, EventsPanel.class));
@@ -921,6 +924,50 @@ public class UiUtil implements Opcodes {
             mv.visitEnd();
         }
 
+        // public List<UIComponentAPI> getChildrenNonCopy(UIComponentAPI parent) {
+        //     if (parent instanceof uiPanelClass) {
+        //         return ((uiPanelClass)parent).getChildrenNonCopy();
+        //     }
+        //     return null;
+        // }
+        {
+            MethodVisitor mv = cw.visitMethod(
+                ACC_PUBLIC,
+                "getChildrenNonCopy",
+                "(" + Type.getDescriptor(UIComponentAPI.class) + ")Ljava/util/List;",
+                null,
+                null
+            );
+            mv.visitCode();
+
+            mv.visitVarInsn(ALOAD, 1);
+            
+            mv.visitTypeInsn(INSTANCEOF, uiPanelInternalName);
+            
+            Label ifInstanceOf = new Label();
+            mv.visitJumpInsn(IFNE, ifInstanceOf);
+            
+            mv.visitInsn(ACONST_NULL);
+            mv.visitInsn(ARETURN);
+            
+            mv.visitLabel(ifInstanceOf);
+            mv.visitVarInsn(ALOAD, 1);
+            mv.visitTypeInsn(CHECKCAST, uiPanelInternalName);
+            
+            mv.visitMethodInsn(
+                INVOKEVIRTUAL,
+                uiPanelInternalName,
+                "getChildrenNonCopy",
+                "()Ljava/util/List;",
+                false
+            );
+
+            mv.visitInsn(ARETURN);
+
+            mv.visitMaxs(0, 0);
+            mv.visitEnd();
+        }
+
         // public List<UIComponentAPI> getChildrenNonCopy(Object uiPanel) {
         //     return ((uiPanelClass)uiPanel).getChildrenNonCopy();
         // }
@@ -928,13 +975,12 @@ public class UiUtil implements Opcodes {
             MethodVisitor mv = cw.visitMethod(
                 ACC_PUBLIC,
                 "getChildrenNonCopy",
-                "(Ljava/lang/Object;)Ljava/util/List;",
+                "(" + uiPanelAPIDesc + ")Ljava/util/List;",
                 null,
                 null
             );
             mv.visitCode();
 
-            String uiPanelInternalName = Type.getInternalName(uiPanelClass);
             mv.visitVarInsn(ALOAD, 1);
             mv.visitTypeInsn(CHECKCAST, uiPanelInternalName);
 
@@ -951,18 +997,14 @@ public class UiUtil implements Opcodes {
             mv.visitMaxs(0, 0);
             mv.visitEnd();
         }
-        cw.visitEnd();
         
-        String classBinaryName = "data/scripts/autopilotwithgates/util/UtilInterface".replace('/', '.');
-
-        return new Class<?>[] {(Class<?>)Refl.getMethodDeclaredAndInvokeDirectly("define",
+        cw.visitEnd();
+        return new Class<?>[] {
             new ClassLoader(UiUtil.class.getClassLoader()) {
-                @SuppressWarnings("unused")
-                Class<?> define(byte[] b) {
-                    return defineClass(classBinaryName, b, 0, b.length);
+                public Class<?> define(byte[] classBytes, String name) {
+                    return defineClass(name, classBytes, 0, classBytes.length);
                 }
-            },
-            cw.toByteArray()),
+            }.define(cw.toByteArray(), "data.scripts.autopilotwithgates.util.UtilInterface"),
             mapClass,
             uiPanelClass,
             uiComponentClass,

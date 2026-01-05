@@ -37,7 +37,7 @@ public class TreeTraverser {
             List<ButtonAPI> buttons = new ArrayList<>();
 
             for (UIComponentAPI child : this.children) {
-                if (ButtonAPI.class.isAssignableFrom(child.getClass())) buttons.add((ButtonAPI)child);
+                if (child instanceof ButtonAPI btn) buttons.add(btn);
             }
             return buttons;
         }
@@ -46,7 +46,7 @@ public class TreeTraverser {
             List<LabelAPI> labels = new ArrayList<>();
 
             for (UIComponentAPI child : this.children) {
-                if (LabelAPI.class.isAssignableFrom(child.getClass())) labels.add((LabelAPI)child);
+                if (child instanceof LabelAPI label) labels.add(label);
             }
             return labels;
         }
@@ -112,7 +112,7 @@ public class TreeTraverser {
     }
 
     private void getChildren(UIComponentAPI parent, int depth) {
-        List<UIComponentAPI> children = UiUtil.uiPanelClass.isInstance(parent) ?  UiUtil.utils.getChildrenNonCopy(parent) : null;
+        List<UIComponentAPI> children = UiUtil.utils.getChildrenNonCopy(parent);
 
         if (children != null && !children.isEmpty()) {
             this.nodes.add(new TreeNode((UIPanelAPI)parent, children, depth));
@@ -126,7 +126,7 @@ public class TreeTraverser {
     }
 
     private void getChildren(UIComponentAPI parent, Map<UIPanelAPI, List<UIComponentAPI>> treeMap, int depth) {
-        List<UIComponentAPI> children = UiUtil.uiPanelClass.isInstance(parent) ? UiUtil.utils.getChildrenNonCopy(parent) : null;
+        List<UIComponentAPI> children = UiUtil.utils.getChildrenNonCopy(parent);
 
         if (children != null && !children.isEmpty()) {
             this.nodes.add(new TreeNode((UIPanelAPI)parent, children, depth));
@@ -142,7 +142,7 @@ public class TreeTraverser {
 
 
     private void getChildren(UIComponentAPI parent, int depth, int depthLimit) {
-        List<UIComponentAPI> children = UiUtil.uiPanelClass.isInstance(parent) ? UiUtil.utils.getChildrenNonCopy(parent) : null;
+        List<UIComponentAPI> children = UiUtil.utils.getChildrenNonCopy(parent);
 
         if (children != null && !children.isEmpty()) {
             this.nodes.add(new TreeNode((UIPanelAPI)parent, children, depth));
@@ -157,7 +157,7 @@ public class TreeTraverser {
     }
 
     private void getChildren(UIComponentAPI parent, int depth, int... treePath) {
-        List<UIComponentAPI> children = UiUtil.uiPanelClass.isInstance(parent) ? UiUtil.utils.getChildrenNonCopy(parent) : null;
+        List<UIComponentAPI> children = UiUtil.utils.getChildrenNonCopy(parent);
 
         if (children != null && !children.isEmpty()) {
             this.nodes.add(new TreeNode((UIPanelAPI)parent, children, depth));
