@@ -160,7 +160,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
             if (interactionDialog != null) {
                 core = utils.interactionDialogGetCore(interactionDialog);
 
-                for (TreeNode node : new TreeTraverser(interactionDialog).getNodes()) {
+                for (TreeNode node : new TreeTraverser((UIPanelAPI)interactionDialog).getNodes()) {
                     for (UIComponentAPI child : node.getChildren()) {
                         if (child.getClass() == UiUtil.mapClass) {
                             mapsPresent = true;
@@ -320,7 +320,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                             @Override
                             public void advance(float arg0) {
                                 if (Global.getSector().getPlayerFleet().getContainingLocation() != exit.getContainingLocation()) return;
-                                
+
                                 self.reportFleetJumped(Global.getSector().getPlayerFleet(), entry, dest);
                                 self.layInCourseFor(ultimateTarget);
 
@@ -826,10 +826,10 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                     );
                 }
 
-                if ((self.currentUltimateTarget.isInHyperspace() && self.currentUltimateTarget instanceof JumpPointAPI jp
-                && jp.getDestinationStarSystem() == self.exitGate.getContainingLocation())
-                || self.currentUltimateTarget.getContainingLocation() == self.exitGate.getContainingLocation()
-                || self.exitGate.getContainingLocation().getJumpPoints().size() == 0) {
+                if ((self.currentUltimateTarget.isInHyperspace()
+                    && self.currentUltimateTarget instanceof JumpPointAPI jp
+                    && jp.getDestinationStarSystem() == self.exitGate.getContainingLocation())    
+                || self.currentUltimateTarget.getContainingLocation() == self.exitGate.getContainingLocation()) {
                     GL11.glPopMatrix();
                     return;
                 }
