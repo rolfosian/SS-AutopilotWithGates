@@ -14,12 +14,14 @@ public class SystemGateData {
     public final StarSystemAPI system;
     public final Vector2f systemLoc;
     public final CustomCampaignEntityAPI[] gates;
+    public final boolean systemHasNoEntry;
     // public final GateData[] gateData;
 
-    public SystemGateData(StarSystemAPI system, List<CustomCampaignEntityAPI> gates) {
+    public SystemGateData(StarSystemAPI system, List<CustomCampaignEntityAPI> gates, boolean systemHasNoEntry) {
         this.system = system;
         this.systemLoc = system.getLocation();
         this.gates = gates.toArray(new CustomCampaignEntityAPI[0]);
+        this.systemHasNoEntry = systemHasNoEntry;
         // this.gateData = new GateData[gates.size()];
 
         // List<SectorEntityToken> jumpPoints = new ArrayList<>();

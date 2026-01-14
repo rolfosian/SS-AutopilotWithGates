@@ -11,6 +11,8 @@ import com.fs.starfarer.api.Global;
 
 import com.fs.starfarer.api.campaign.CampaignFleetAPI;
 import com.fs.starfarer.api.campaign.CustomCampaignEntityAPI;
+import com.fs.starfarer.api.campaign.JumpPointAPI;
+import com.fs.starfarer.api.campaign.NascentGravityWellAPI;
 import com.fs.starfarer.api.campaign.SectorAPI;
 import com.fs.starfarer.api.campaign.SectorEntityToken;
 import com.fs.starfarer.api.campaign.StarSystemAPI;
@@ -234,50 +236,89 @@ public class AutopilotWithGatesPlugin extends BaseModPlugin {
 
         systemGateIteratorThread = new Thread(
             Thread.currentThread().getThreadGroup(),
-            new Runnable() {
-                @Override
-                public void run() {
-                    while (iteratorRunning) {
-                        if (!Display.isActive() || Global.getCurrentState() != GameState.CAMPAIGN) {
-                            try {
-                                Thread.sleep(10);
-                                continue;
-                            } catch (InterruptedException e) {
-                                Thread.currentThread().interrupt();
-                                break;
-                            }
-                        }
-                        List<SystemGateData> newSystemGateData = new ArrayList<>();
-            
-                        for (StarSystemAPI system : Global.getSector().getStarSystems()) {
-                            List<CustomCampaignEntityAPI> gates = system.getCustomEntitiesWithTag(Tags.GATE);
-                
-                            if (gates.size() > 0) {
-                                List<CustomCampaignEntityAPI> gatos = new ArrayList<>();
-                                for (CustomCampaignEntityAPI gate : gates) {
-                                    if (GateEntityPlugin.isScanned(gate)) gatos.add(gate);
-                                }
-                                if (gatos.size() > 0) newSystemGateData.add(new SystemGateData(system, gatos));
-                            } 
-                        }
-        
-                        synchronized(systemGateData) {
-                            systemGateData.clear();
-                            systemGateData.addAll(newSystemGateData);
-                        }
-
+            () -> {
+                while (iteratorRunning) {
+                    if (!Display.isActive() || Global.getCurrentState() != GameState.CAMPAIGN) {
                         try {
-                            Thread.sleep(100);
-                        } catch (InterruptedException e) {
+                            Thread.sleep(10);
+                            continue;
+                        } catch (Exception e) {
                             Thread.currentThread().interrupt();
                             break;
                         }
                     }
+
+                    List<SystemGateData> newSystemGateData = new ArrayList<>();
+                    for (StarSystemAPI system : snapshot(Global.getSector().getStarSystems())) {
+                        List<CustomCampaignEntityAPI> gates = snapshot(system.getCustomEntitiesWithTag(Tags.GATE));
+            
+                        if (gates.size() > 0) {
+                            List<CustomCampaignEntityAPI> gatos = new ArrayList<>();
+                            for (CustomCampaignEntityAPI gate : gates) {
+                                if (GateEntityPlugin.isScanned(gate)) gatos.add(gate);
+                            }
+                            if (gatos.size() > 0) newSystemGateData.add(new SystemGateData(system, gatos, isNoEntry(system)));
+                        } 
+                    }
+    
+                    synchronized(systemGateData) {
+                        systemGateData.clear();
+                        systemGateData.addAll(newSystemGateData);
+                    }
+
+                    try {
+                        Thread.sleep(100);
+                    } catch (Exception e) {
+                        Thread.currentThread().interrupt();
+                        break;
+                    }
                 }
-            },
+            }
+            ,
             "AutopilotWithGatesIterator"
         );
 
         systemGateIteratorThread.start();
+    }
+
+    private static <T> List<T> snapshot(List<T> list) {
+        if (list == null) return Collections.emptyList();
+    
+        for (int i = 0; i < 5; i++) {
+            try {
+                return new ArrayList<>(list);
+            } catch (ConcurrentModificationException ignored) {
+                try {
+                    Thread.sleep(30);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        }
+    
+        return Collections.emptyList();
+    }
+
+    private static boolean isNoEntry(StarSystemAPI system) {
+        if (system.hasTag(Tags.SYSTEM_CUT_OFF_FROM_HYPER)) return true;
+
+        try {
+            for (NascentGravityWellAPI well : snapshot(Global.getSector().getHyperspace().getGravityWells())) {
+                if (well.getTarget().getContainingLocation() == system) return false;
+            }
+    
+            List<JumpPointAPI> autoGeneratedJumpPointsInHyper = snapshot(system.getAutogeneratedJumpPointsInHyper());
+            List<NascentGravityWellAPI> autoGeneratedNascentWells = snapshot(system.getAutogeneratedNascentWellsInHyper());
+            List<NascentGravityWellAPI> gravityWells = snapshot(system.getGravityWells());
+            List<SectorEntityToken> jumpPoints = snapshot(system.getJumpPoints());
+            
+            return jumpPoints.isEmpty()
+                && autoGeneratedJumpPointsInHyper.isEmpty()
+                && autoGeneratedNascentWells.isEmpty()
+                && gravityWells.isEmpty();
+
+        } catch (ConcurrentModificationException e) {
+            return isNoEntry(system);
+        }
     }
 }

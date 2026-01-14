@@ -1,9 +1,13 @@
 package data.scripts.autopilotwithgates.util;
 
+import java.util.*;
+
 import org.apache.log4j.Logger;
 import org.lwjgl.util.vector.Vector2f;
 
 import com.fs.starfarer.api.Global;
+import com.fs.starfarer.api.util.Misc;
+
 import com.fs.starfarer.api.campaign.CampaignFleetAPI;
 import com.fs.starfarer.api.campaign.CustomCampaignEntityAPI;
 import com.fs.starfarer.api.campaign.JumpPointAPI;
@@ -11,15 +15,12 @@ import com.fs.starfarer.api.campaign.LocationAPI;
 import com.fs.starfarer.api.campaign.PlanetAPI;
 import com.fs.starfarer.api.campaign.SectorEntityToken;
 import com.fs.starfarer.api.campaign.StarSystemAPI;
+
 import com.fs.starfarer.api.impl.campaign.GateEntityPlugin;
 import com.fs.starfarer.api.impl.campaign.ids.Tags;
-// import com.fs.starfarer.api.impl.campaign.rulecmd.missions.GateCMD;
-import com.fs.starfarer.api.util.Misc;
 
 import data.scripts.autopilotwithgates.AutopilotWithGatesPlugin;
 import data.scripts.autopilotwithgates.SystemGateData;
-
-import java.util.*;
 
 public class GateFinder {
     private static final Logger logger = Logger.getLogger(GateFinder.class);
@@ -91,6 +92,8 @@ public class GateFinder {
 
         synchronized(AutopilotWithGatesPlugin.systemGateData) {
             for (SystemGateData systemGateData : AutopilotWithGatesPlugin.systemGateData) {
+                if (systemGateData.systemHasNoEntry) continue;
+
                 float distSq = getDistSq(systemGateData.systemLoc, targetHyperspaceLoc);
                 
                 if (distSq < bestDistSq) {
