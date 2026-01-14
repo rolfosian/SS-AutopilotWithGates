@@ -84,7 +84,10 @@ public class AutopilotWithGatesPlugin extends BaseModPlugin {
             systemGateData = null;
         }
 
-        if (listener != null && !listener.getMaps().isEmpty()) listener.getMaps().clear();
+        if (listener != null) {
+            if (!listener.getMaps().isEmpty()) listener.getMaps().clear();
+            listener.removeArrowRenderer();
+        }
 
         listener = new AutoPilotListener(abilityActive);
         sector.addTransientListener(listener);
@@ -151,7 +154,10 @@ public class AutopilotWithGatesPlugin extends BaseModPlugin {
             abilityScroll = Global.getSettings().getBoolean("gateAutopilot_abilityScroll");
         }
 
-        if (abilityScroller != null) abilityScroller.remove();
+        if (abilityScroller != null) {
+            abilityScroller.remove();
+            abilityScroller = null;
+        }
 
         if (abilityScroll) {
             Global.getSector().addTransientScript(new EveryFrameScript() {
@@ -276,8 +282,7 @@ public class AutopilotWithGatesPlugin extends BaseModPlugin {
                         break;
                     }
                 }
-            }
-            ,
+            },
             "AutopilotWithGatesIterator"
         );
 
