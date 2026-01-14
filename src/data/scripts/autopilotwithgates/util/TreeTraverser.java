@@ -52,7 +52,7 @@ public class TreeTraverser {
         }
     }
 
-    private final Object parentPanel;
+    private final UIPanelAPI parentPanel;
     private List<TreeNode> nodes;
     private Map<UIPanelAPI, List<UIComponentAPI>> treeMap = null;
     private TreeNode targetNode = null;
@@ -60,26 +60,26 @@ public class TreeTraverser {
     private int currentIndex;
     
     /**  Get entire panel tree */
-    public TreeTraverser(Object parentPanel) {
+    public TreeTraverser(UIPanelAPI parentPanel) {
         this.parentPanel = parentPanel;
         refresh();
     }
 
     /** Get entire panel tree and map parents to children */
-    public TreeTraverser(Object parentPanel, Map<UIPanelAPI, List<UIComponentAPI>> treeMap) {
+    public TreeTraverser(UIPanelAPI parentPanel, Map<UIPanelAPI, List<UIComponentAPI>> treeMap) {
         this.parentPanel = parentPanel;
         this.treeMap = treeMap;
         refresh(treeMap);
     }
 
     // get panel tree up to depth before limit
-    public TreeTraverser(Object parentPanel, int depthLimit) {
+    public TreeTraverser(UIPanelAPI parentPanel, int depthLimit) {
         this.parentPanel = parentPanel;
         refresh(depthLimit);
     }
 
     // beeline to single target child, assuming we know the definite index of the target, final param in varargs should be the index of the target child in the children list
-    public TreeTraverser(Object parentPanel, int... treePath) {
+    public TreeTraverser(UIPanelAPI parentPanel, int... treePath) {
         this.parentPanel = parentPanel;
         refresh(treePath);
     }
