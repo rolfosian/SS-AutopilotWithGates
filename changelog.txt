@@ -6,5 +6,18 @@ Version 0.0.3b
 
 Version 0.0.3c
 
-- Added mouse scrolling for campaign ability bar via ctrl+scroll with mouse over ability bar (Disabled by default, enable via LunaSettings or settings.json if lunalib isn't installed/enabled)
+- Added mouse scrolling for campaign ability bar with mouse over ability bar (Disabled by default, enable via LunaSettings or settings.json if lunalib isn't installed/enabled)
 - Fixed bug introduced with 0.0.3b where the course arrows would stop rendering on the intel map if the tab was opened again when it was already open
+
+Version 0.0.4
+
+- Added console command "AddGateAtPlayerLoc" which spawns an inactive gate at the player's location (It doesn't orbit anything)
+- Added console command "ScanAllGates" which scans all gates in the sector
+
+- Changed map handling under the hood, improved course arrows movement on maps
+- Fixed crash that could occur if the game was launched with a different jre version than the one the game ships with
+- Fixed crash that could occur when LunaLib wasn't enabled
+- Fixed course arrows not rendering on the hyperspace map of the planet tab of the intel core tab
+- Fixed autopilot trying to use gates in systems with no viable entry point for entry gates, if the player is outside that location
+- Fixed "go dark" ability disabling the autopilot with gates ability
+- Fixed potential for rare silent concurrent modification exception on gate iterator thread which would have resulted in the autopilot missing gates that were scanned or added during gameplay until reload
