@@ -398,13 +398,13 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                 dialog.getPlugin().getMemoryMap().put("$gateAutoPilotRule", mem);
 
                 dialog.getOptionPanel().addOption(
-                    "Travel through the gate to " + exit.getContainingLocation().getName(),
+                    "Travel through the Gate to " + exit.getContainingLocation().getName(),
                     "gateAutoPilotRule"
                 );
                 dialog.getOptionPanel().addOptionTooltipAppender("gateAutoPilotRule", new OptionTooltipCreator() {
                     @Override
                     public void createTooltip(TooltipMakerAPI arg0, boolean arg1) {
-                        arg0.addParaWithMarkup("Travel through the gate to get to ultimate autopilot course target " + ultimateTarget.getName() + " in "
+                        arg0.addParaWithMarkup("Travel through the Gate to get to ultimate autopilot course target " + ultimateTarget.getName() + " in "
                             + ultimateTarget.getContainingLocation().getName() + " at the cost of {{%s}} fuel.",
                             0f,
                             String.valueOf(cost)
@@ -416,7 +416,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
             } else {
                 CustomCampaignEntityAPI exit = this.exitGate;
                 dialog.getOptionPanel().addOption(
-                    "Travel through the gate to " + exit.getContainingLocation().getName(),
+                    "Travel through the Gate to " + exit.getContainingLocation().getName(),
                     "gateAutoPilotRule"
                 );
                 dialog.getOptionPanel().addOptionTooltipAppender("gateAutoPilotRule", new OptionTooltipCreator() {
@@ -692,13 +692,19 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
             boolean isHyperSpace = maxZoomFactor > 3.0f;
             boolean shouldRenderRegularCourse = true;
 
+            Vector2f playerLocation = playerFleet.getLocation();
+            Vector2f targetLocation = nextStep.getLocation();
+
             boolean isStar = false;
-            if (self.currentUltimateTarget.isInHyperspace() && self.currentUltimateTarget instanceof JumpPointAPI jumpPoint && !jumpPoint.getDestinations().isEmpty()) {
+            if (isHyperSpace && self.currentUltimateTarget.isInHyperspace() && self.currentUltimateTarget instanceof JumpPointAPI jumpPoint && !jumpPoint.getDestinations().isEmpty()) {
                 SectorEntityToken destination = jumpPoint.getDestinations().get(0).getDestination();
                 if (destination != null && destination.getStarSystem() != null) {
                     if (destination.isStar()) {
                         isStar = true;
-                        nextStep = self.currentUltimateTarget;
+
+                        playerLocation = playerFleet.getLocationInHyperspace();
+                        nextStep = destination.getStarSystem().getStar();
+                        targetLocation = nextStep.getLocationInHyperspace();
                     }
                 }
                 
@@ -708,15 +714,13 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                 SectorEntityToken destination = jumpPoint.getDestinations().get(0).getDestination();
                 if (destination != null && destination.getStarSystem() != null) {
                     nextStep = destination.getStarSystem().getHyperspaceAnchor();
+                    targetLocation = nextStep.getLocationInHyperspace();
                 }
             }
 
             BaseLocation mapLoc = utils.mapGetLocation(this.map);
 
-            Vector2f playerLocation = playerFleet.getLocation();
-            Vector2f targetLocation = nextStep.getLocation();
-
-            if (mapLoc != nextStep.getContainingLocation()) {
+            if (!isStar && mapLoc != nextStep.getContainingLocation()) {
                 if (!isHyperSpace || mapLoc == null) return;
                 if (self.noExitJumpPoints) shouldRenderRegularCourse = false;
 
@@ -835,7 +839,11 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                 }
                 
                 playerLocation = targetLocation;
-                targetLocation = self.currentUltimateTarget.getLocationInHyperspace();
+                if (self.currentUltimateTarget instanceof JumpPointAPI jp && jp.isInHyperspace() && jp.getDestinations().get(0).getDestination().isStar()) {
+                    targetLocation = jp.getDestinationStarSystem().getStar().getLocationInHyperspace();
+                } else {
+                    targetLocation = self.currentUltimateTarget.getLocationInHyperspace();
+                }
 
                 if (distanceBetween(playerLocation, targetLocation) >= 1000f) {
                     arrowSize = 10.0F;
@@ -937,7 +945,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
         }
     };
 
-    private static float distanceBetween(Vector2f pos1, Vector2f pos2) {
+    public static float distanceBetween(Vector2f pos1, Vector2f pos2) {
         return (float)Math.sqrt((double)((pos1.x - pos2.x) * (pos1.x - pos2.x) + (pos1.y - pos2.y) * (pos1.y - pos2.y)));
     }
     

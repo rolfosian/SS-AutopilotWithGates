@@ -1237,15 +1237,15 @@ public class UiUtil implements Opcodes {
     private static byte[] readStream(Object inputStream) {
         try {
             Class<?> baosClass = Class.forName("java.io.ByteArrayOutputStream", false, Class.class.getClassLoader());
+            Class<?> inputStreamClass = Class.forName("java.io.InputStream", false, Class.class.getClassLoader());
 
             Object baosCtor = Refl.getConstructor(baosClass, new Class<?>[0]);
             Object baosWriteMethod = Refl.getMethodExplicit("write", baosClass, new Class<?>[]{byte[].class, int.class, int.class});
-            Object baosFlushMethod = Refl.getMethod("flush", baosClass);
+            Object outputStreamFlushMethod = Refl.getMethod("flush", baosClass.getSuperclass());
             Object baosToByteArrayMethod = Refl.getMethod("toByteArray", baosClass);
     
-            Class<?> inputStreamClass = inputStream.getClass();
             Object inputStreamAvailableMethod = Refl.getMethod("available", inputStreamClass);
-            Object inputStreamReadMethod = Refl.getMethod("read", inputStreamClass);
+            Object inputStreamReadMethod = Refl.getMethodExplicit("read", inputStreamClass, new Class<?>[] {byte[].class, int.class, int.class});
 
             int bufferSize = computeBufferSize(inputStream, inputStreamAvailableMethod);
             Object outputStream = Refl.instantiateClass(baosCtor);
@@ -1259,7 +1259,7 @@ public class UiUtil implements Opcodes {
                 readCount++;
             }
             
-            Refl.invokeMethodDirectly(baosFlushMethod, outputStream);
+            Refl.invokeMethodDirectly(outputStreamFlushMethod, outputStream);
             if (readCount == 1) {
                 return data;
             }

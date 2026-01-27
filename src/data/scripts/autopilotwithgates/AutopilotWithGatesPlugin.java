@@ -8,6 +8,7 @@ import com.fs.starfarer.api.BaseModPlugin;
 import com.fs.starfarer.api.EveryFrameScript;
 import com.fs.starfarer.api.GameState;
 import com.fs.starfarer.api.Global;
+import com.fs.starfarer.api.util.IntervalUtil;
 
 import com.fs.starfarer.api.campaign.CampaignFleetAPI;
 import com.fs.starfarer.api.campaign.CustomCampaignEntityAPI;
@@ -22,7 +23,6 @@ import com.fs.starfarer.api.impl.campaign.GateEntityPlugin;
 import com.fs.starfarer.api.impl.campaign.ids.Tags;
 
 import com.fs.starfarer.api.ui.UIPanelAPI;
-import com.fs.starfarer.api.util.IntervalUtil;
 
 import com.fs.starfarer.campaign.BaseLocation;
 import com.fs.starfarer.campaign.CampaignEngine;
@@ -31,7 +31,6 @@ import com.fs.starfarer.campaign.CampaignUIPersistentData.AbilitySlots;
 import data.scripts.autopilotwithgates.util.GateFinder;
 import data.scripts.autopilotwithgates.util.Refl;
 import data.scripts.autopilotwithgates.util.UiUtil;
-
 
 import lunalib.lunaSettings.LunaSettings;
 
@@ -65,16 +64,6 @@ public class AutopilotWithGatesPlugin extends BaseModPlugin {
             persistentData.put("$autopilotWithGatesAbility", false);
             abilityActive = false;
         }
-
-        // for (StarSystemAPI system : Global.getSector().getStarSystems()) {
-        //     List<CustomCampaignEntityAPI> gates = system.getCustomEntitiesWithTag(Tags.GATE);
-        //     for (CustomCampaignEntityAPI gate : gates) {
-        //         if (!GateEntityPlugin.isScanned(gate)) {
-        //             GateCMD.notifyScanned(gate);
-        //             gate.getMemoryWithoutUpdate().set("$gateScanned", true);
-        //         } 
-        //     }
-        // }
 
         if (systemGateIteratorThread != null) {
             iteratorRunning = false;

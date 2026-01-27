@@ -1,2 +1,4 @@
 command,class,tags,syntax,help
 removeapwg,data.scripts.autopilotwithgates.console.RemoveAbility,"autopilot",remove_gates_autopilot,"Removes the auto pilot with gates ability and saves the game"
+AddGateAtPlayerLoc,data.scripts.autopilotwithgates.console.AddGateAtPlayerLoc,"cheat",AddGateAtPlayerLoc <name>,"Adds an inactive gate at the player's location"
+ScanAllGates,data.scripts.autopilotwithgates.console.ScanAllGates,"cheat",,"Scans all gates in the sector"
