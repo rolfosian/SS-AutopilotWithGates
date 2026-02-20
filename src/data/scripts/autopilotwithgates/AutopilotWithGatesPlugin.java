@@ -21,7 +21,6 @@ import com.fs.starfarer.api.campaign.comm.CommMessageAPI.MessageClickAction;
 
 import com.fs.starfarer.api.impl.campaign.GateEntityPlugin;
 import com.fs.starfarer.api.impl.campaign.ids.Tags;
-
 import com.fs.starfarer.api.ui.UIPanelAPI;
 
 import com.fs.starfarer.campaign.BaseLocation;
@@ -233,42 +232,53 @@ public class AutopilotWithGatesPlugin extends BaseModPlugin {
             Thread.currentThread().getThreadGroup(),
             () -> {
                 while (iteratorRunning) {
-                    if (!Display.isActive() || Global.getCurrentState() != GameState.CAMPAIGN) {
+                    try {
+                        if (!Display.isActive() || Global.getCurrentState() != GameState.CAMPAIGN) {
+                            try {
+                                Thread.sleep(10);
+                                continue;
+                            } catch (InterruptedException ignore) {
+                                Thread.currentThread().interrupt();
+                                break;
+                            }
+                        }
+    
+                        List<NascentGravityWellAPI> wells = snapshot(Global.getSector().getHyperspace().getGravityWells());
+                        List<SectorEntityToken> jumpPoints = snapshot(Global.getSector().getHyperspace().getJumpPoints());
+                        List<SystemGateData> newSystemGateData = new ArrayList<>();
+    
+                        for (StarSystemAPI system : snapshot(Global.getSector().getStarSystems())) {
+                            List<CustomCampaignEntityAPI> gates = snapshot(system.getCustomEntitiesWithTag(Tags.GATE));
+                
+                            if (gates.size() > 0) {
+                                List<CustomCampaignEntityAPI> gatos = new ArrayList<>();
+                                for (CustomCampaignEntityAPI gate : gates) {
+                                    if (isScanned(gate)) gatos.add(gate);
+                                }
+                                if (gatos.size() > 0) newSystemGateData.add(new SystemGateData(system, gatos, isNoEntry(system, wells, jumpPoints)));
+                            } 
+                        }
+        
+                        synchronized(systemGateData) {
+                            systemGateData.clear();
+                            systemGateData.addAll(newSystemGateData);
+                        }
+    
                         try {
-                            Thread.sleep(10);
-                            continue;
-                        } catch (Exception e) {
+                            Thread.sleep(100);
+                        } catch (InterruptedException ignore) {
                             Thread.currentThread().interrupt();
                             break;
                         }
-                    }
 
-                    List<NascentGravityWellAPI> wells = snapshot(Global.getSector().getHyperspace().getGravityWells());
-                    List<SectorEntityToken> jumpPoints = snapshot(Global.getSector().getHyperspace().getJumpPoints());
-                    List<SystemGateData> newSystemGateData = new ArrayList<>();
-
-                    for (StarSystemAPI system : snapshot(Global.getSector().getStarSystems())) {
-                        List<CustomCampaignEntityAPI> gates = snapshot(system.getCustomEntitiesWithTag(Tags.GATE));
-            
-                        if (gates.size() > 0) {
-                            List<CustomCampaignEntityAPI> gatos = new ArrayList<>();
-                            for (CustomCampaignEntityAPI gate : gates) {
-                                if (isScanned(gate)) gatos.add(gate);
-                            }
-                            if (gatos.size() > 0) newSystemGateData.add(new SystemGateData(system, gatos, isNoEntry(system, wells, jumpPoints)));
-                        } 
-                    }
-    
-                    synchronized(systemGateData) {
-                        systemGateData.clear();
-                        systemGateData.addAll(newSystemGateData);
-                    }
-
-                    try {
-                        Thread.sleep(100);
-                    } catch (Exception e) {
-                        Thread.currentThread().interrupt();
-                        break;
+                    } catch (Throwable e) {
+                        try {
+                            Thread.sleep(1);
+                            continue;
+                        } catch (InterruptedException ignore) {
+                            Thread.currentThread().interrupt();
+                            break;
+                        }
                     }
                 }
             },
@@ -319,13 +329,5 @@ public class AutopilotWithGatesPlugin extends BaseModPlugin {
             if (token instanceof JumpPointAPI jp && jp.getDestinationStarSystem() == system) return false;
         }
         return true;
-    }
-
-    public static void bleh() {
-        synchronized(systemGateData) {
-            for (SystemGateData data : systemGateData) {
-                Global.getLogger(Global.class).info(data.system.getName() + " " + data.systemHasNoEntry);
-            }
-        }
     }
 }
