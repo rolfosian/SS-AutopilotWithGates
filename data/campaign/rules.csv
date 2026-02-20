@@ -1,2 +1,3 @@
 id,trigger,conditions,script,text,options,notes
 gateAutoPilotRule,DialogOptionSelected,$option == gateAutoPilotRule,GateAutoPilotRule,,,
+gateAutoPilotTransponderRule,DialogOptionSelected,$option == gateAutoPilotTransponderRule,GateAutoPilotTransponderRule,,,

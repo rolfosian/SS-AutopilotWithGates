@@ -34,7 +34,6 @@ import com.fs.starfarer.api.campaign.StarSystemAPI;
 import com.fs.starfarer.api.campaign.comm.CommMessageAPI.MessageClickAction;
 import com.fs.starfarer.api.campaign.listeners.ListenerUtil;
 import com.fs.starfarer.api.campaign.rules.MemoryAPI;
-
 import com.fs.starfarer.api.impl.campaign.GateEntityPlugin;
 import com.fs.starfarer.api.impl.campaign.rulecmd.missions.GateCMD;
 
@@ -51,9 +50,9 @@ import com.fs.starfarer.api.util.Misc;
 import data.scripts.autopilotwithgates.util.GateAutoPilotRuleMemory;
 import data.scripts.autopilotwithgates.util.GateFinder;
 import data.scripts.autopilotwithgates.util.UiUtil;
-import data.scripts.autopilotwithgates.util.UiUtil.UtilInterface;
 import data.scripts.autopilotwithgates.util.TreeTraverser;
 import data.scripts.autopilotwithgates.util.TreeTraverser.TreeNode;
+import static data.scripts.autopilotwithgates.util.UiUtil.utils;
 
 import lunalib.lunaSettings.LunaSettings;
 
@@ -67,7 +66,6 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
         }
         logger.info(sb.toString());
     }
-    private static final UtilInterface utils = UiUtil.utils;
 
     private static final EnumSet<CampaignEngineLayers> layers = EnumSet.of(CampaignEngineLayers.FLEETS);
     private static final Color DARK_RED = new Color(139, 0, 0);
@@ -395,6 +393,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
 
                 MemoryAPI mem = new GateAutoPilotRuleMemory();
                 mem.set("jump", jump);
+                mem.set("dest", exit);
                 dialog.getPlugin().getMemoryMap().put("$gateAutoPilotRule", mem);
 
                 dialog.getOptionPanel().addOption(
