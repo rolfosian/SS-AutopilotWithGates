@@ -1280,16 +1280,16 @@ public class UiUtil implements Opcodes {
         ClassReader cr = new ClassReader(readStream(inputStream));
         final String[] foundName = {null};
 
-        cr.accept(new ClassVisitor(Opcodes.ASM9) {
+        cr.accept(new ClassVisitor(ASM9) {
             @Override
             public MethodVisitor visitMethod(int access, String name, String desc, String sig, String[] ex) {
     
                 if (!desc.equals("()V") || !name.equals("showAbilityBar") || foundName[0] != null) return null;
     
-                return new MethodVisitor(Opcodes.ASM9) {
+                return new MethodVisitor(ASM9) {
                     @Override
                     public void visitFieldInsn(int opcode, String owner, String fld, String fldDesc) {
-                        if (opcode == Opcodes.GETFIELD && foundName[0] == null) foundName[0] = fld;
+                        if (opcode == GETFIELD && foundName[0] == null) foundName[0] = fld;
                     }
                 };
             }
@@ -1312,12 +1312,12 @@ public class UiUtil implements Opcodes {
         ClassReader cr = new ClassReader(stream);
         final String[] maxZoomFactorFieldName = {null};
 
-        cr.accept(new ClassVisitor(Opcodes.ASM9) {
+        cr.accept(new ClassVisitor(ASM9) {
             @Override
             public MethodVisitor visitMethod(int access, String name, String desc, String sig, String[] ex) {
                 if (!desc.equals("()F")) return null;
 
-                return new MethodVisitor(Opcodes.ASM9) {
+                return new MethodVisitor(ASM9) {
                     int fieldGets = 0;
                     int fcmps = 0;
                     int fReturns = 0;
@@ -1327,7 +1327,7 @@ public class UiUtil implements Opcodes {
     
                     @Override
                     public void visitFieldInsn(int opcode, String owner, String fld, String fldDesc) {
-                        if (opcode == Opcodes.GETFIELD && fldDesc.equals("F")) {
+                        if (opcode == GETFIELD && fldDesc.equals("F")) {
                             fieldGets++;
                             lastFieldName = fld;
                         }
@@ -1335,13 +1335,13 @@ public class UiUtil implements Opcodes {
     
                     @Override
                     public void visitInsn(int opcode) {
-                        if (opcode == Opcodes.FCMPG || opcode == Opcodes.FCMPL) {
+                        if (opcode == FCMPG || opcode == FCMPL) {
                             fcmps++;
                             if (fcmps == 2) {
                                 secondCompareField = lastFieldName;
                             }
                         }
-                        if (opcode == Opcodes.FRETURN) {
+                        if (opcode == FRETURN) {
                             fReturns++;
                         }
                     }
@@ -1357,12 +1357,12 @@ public class UiUtil implements Opcodes {
             }
         }, 0);
 
-        cr.accept(new ClassVisitor(Opcodes.ASM9) {
+        cr.accept(new ClassVisitor(ASM9) {
             @Override
             public MethodVisitor visitMethod(int access, String name, String desc, String sig, String[] ex) {
                 if (!desc.equals("()F") || access != ACC_PUBLIC) return null;
 
-                return new MethodVisitor(Opcodes.ASM9) {
+                return new MethodVisitor(ASM9) {
                     int fieldGets = 0;
                     int fReturns = 0;
                     int visitFieldInsns = 0;
@@ -1376,14 +1376,14 @@ public class UiUtil implements Opcodes {
                     @Override
                     public void visitFieldInsn(int opcode, String owner, String fld, String fldDesc) {
                         visitFieldInsns++;
-                        if (opcode == Opcodes.GETFIELD && fldDesc.equals("F") && fld.equals(maxZoomFactorFieldName[0])) {
+                        if (opcode == GETFIELD && fldDesc.equals("F") && fld.equals(maxZoomFactorFieldName[0])) {
                             fieldGets++;
                         }
                     }
 
                     @Override
                     public void visitInsn(int opcode) {
-                        if (opcode == Opcodes.FRETURN) {
+                        if (opcode == FRETURN) {
                             fReturns++;
                         }
                     }
