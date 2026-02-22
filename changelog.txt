@@ -21,3 +21,8 @@ Version 0.0.4
 - Fixed autopilot trying to use gates in systems with no viable entry point for entry gates, if the player is outside that location
 - Fixed "go dark" ability disabling the autopilot with gates ability
 - Fixed potential for rare silent concurrent modification exception on gate iterator thread which would have resulted in the autopilot missing gates that were scanned or added during gameplay until reload
+
+Version 0.0.5
+
+- Added extra dialog prompt to confirm transponder status for jump when transponder is off and target gate system is populated similar to vanilla jump points behavior
+- Fixed bug with rare exception on gate iterator thread which could result in crash on new game or the autopilot missing gates that were scanned or added during gameplay until reload
