@@ -25,4 +25,4 @@ Version 0.0.4
 Version 0.0.5
 
 - Added extra dialog prompt to confirm transponder status for jump when transponder is off and target gate system is populated similar to vanilla jump points behavior
-- Fixed bug with rare exception on gate iterator thread which could result in crash on new game or the autopilot missing gates that were scanned or added during gameplay until reload
+- Fixed bug with rare exception on gate iterator thread which could result in the autopilot missing gates that were scanned or added during gameplay until reload
