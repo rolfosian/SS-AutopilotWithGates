@@ -85,7 +85,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
 
     private boolean postGateJump = false;
     private boolean abilityActive = false;
-    private boolean wasJustActivated = false;
+    private boolean wasJustActivated = true;
     private boolean wasJustGotCloserThanGate = false;
 
     private boolean noExitJumpPoints = true;
@@ -122,6 +122,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
         SectorEntityToken ultimateTarget = campaignUI.getUltimateCourseTarget();
         if (ultimateTarget == null) {
             if (!this.maps.isEmpty()) maps.clear();
+            if (this.renderingArrow) removeArrowRenderer();
 
             this.currentUltimateTarget = null;
             this.entryGate = null;
