@@ -448,6 +448,10 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
         if (this.messageDisplayList.size() > messageDisplayListSize) this.messageDisplayList.remove(this.messageDisplayList.size()-1);
     }
 
+    protected List<Object> getMessageDisplayList() {
+        return this.messageDisplayList;
+    }
+
     public void on() {
         this.abilityActive = true;
         this.wasJustActivated = true;

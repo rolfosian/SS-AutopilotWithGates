@@ -181,13 +181,21 @@ public class AutopilotWithGatesPlugin extends BaseModPlugin {
         }
     }
 
+    private void layInCourseFor(SectorEntityToken target) {
+        List<Object> messageDisplayList = listener.getMessageDisplayList();
+
+        int messageDisplayListSize = messageDisplayList.size();
+        Global.getSector().layInCourseFor(target);
+        if (messageDisplayList.size() > messageDisplayListSize) messageDisplayList.remove(messageDisplayList.size()-1);
+    }
+
     private BaseLocation arrowRenderingLoc;
     private boolean followMouse = false;
     @Override
     public void beforeGameSave() {
         this.followMouse = Global.getSector().getCampaignUI().isPlayerFleetFollowingMouse() || Global.getSector().getCampaignUI().isFollowingDirectCommand();
         SectorEntityToken ult = listener.getCurrentUltimateTarget();
-        if (ult != null) Global.getSector().layInCourseFor(ult);
+        if (ult != null) this.layInCourseFor(ult);
 
         this.arrowRenderingLoc = listener.getArrowRenderingLoc();
         if (this.arrowRenderingLoc != null) listener.removeArrowRenderer();
@@ -207,7 +215,7 @@ public class AutopilotWithGatesPlugin extends BaseModPlugin {
     public void afterGameSave() {
         SectorEntityToken entry = listener.getEntryGate();
         if (entry != null) {
-            Global.getSector().layInCourseFor(entry);
+            this.layInCourseFor(entry);
             if (this.followMouse) UiUtil.setFollowMouseTrue(Global.getSector().getCampaignUI());
         }
 
