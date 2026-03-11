@@ -216,9 +216,9 @@ public class AutopilotWithGatesPlugin extends BaseModPlugin {
         SectorEntityToken entry = listener.getEntryGate();
         if (entry != null) {
             this.layInCourseFor(entry);
-            if (this.followMouse) UiUtil.setFollowMouseTrue(Global.getSector().getCampaignUI());
         }
-
+        
+        if (this.followMouse) UiUtil.setFollowMouseTrue(Global.getSector().getCampaignUI());
         this.followMouse = false;
 
         if (this.arrowRenderingLoc != null) {
