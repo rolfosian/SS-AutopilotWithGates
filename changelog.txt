@@ -31,3 +31,7 @@ Version 0.0.6
 
 - Made it so autopilot doesn't resume automated course after saving the game if player is manually navigating while having a course set
 - Stopped top middle "course laid in for x" messages showing on save
+
+Version 0.0.6a
+
+- Made it so autopilot doesn't resume automated course after saving the game if player is manually navigating while having a course set to a target **in system**
