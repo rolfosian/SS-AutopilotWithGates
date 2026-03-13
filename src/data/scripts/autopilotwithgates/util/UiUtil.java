@@ -1126,6 +1126,10 @@ public class UiUtil implements Opcodes {
         followMouseVarHandle.set(campaignUI, true);
     }
 
+    public static void followEntity(CampaignUIAPI campaignUI, SectorEntityToken entity) {
+        ((CampaignState)campaignUI).followEntity(entity, true);
+    }
+
     public static void setAbilitySlots(AbilitySlots abilitySlots, AbilitySlot[][] slots) {
         abilitySlotsVarHandle.set(abilitySlots, slots);
     }

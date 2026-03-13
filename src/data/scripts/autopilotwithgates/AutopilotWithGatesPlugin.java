@@ -191,9 +191,14 @@ public class AutopilotWithGatesPlugin extends BaseModPlugin {
 
     private BaseLocation arrowRenderingLoc;
     private boolean followMouse = false;
+    private boolean followingDirectCommand = false;
+    private SectorEntityToken interactionTarget = null;
     @Override
     public void beforeGameSave() {
-        this.followMouse = Global.getSector().getCampaignUI().isPlayerFleetFollowingMouse() || Global.getSector().getCampaignUI().isFollowingDirectCommand();
+        this.followMouse = Global.getSector().getCampaignUI().isPlayerFleetFollowingMouse();
+        this.followingDirectCommand = Global.getSector().getCampaignUI().isFollowingDirectCommand();
+        this.interactionTarget = Global.getSector().getPlayerFleet().getInteractionTarget();
+
         SectorEntityToken ult = listener.getCurrentUltimateTarget();
         if (ult != null) this.layInCourseFor(ult);
 
@@ -217,9 +222,13 @@ public class AutopilotWithGatesPlugin extends BaseModPlugin {
         if (entry != null) {
             this.layInCourseFor(entry);
         }
-        
+
         if (this.followMouse) UiUtil.setFollowMouseTrue(Global.getSector().getCampaignUI());
+        else if (this.followingDirectCommand && this.interactionTarget != null) UiUtil.followEntity(Global.getSector().getCampaignUI(), this.interactionTarget);
+
         this.followMouse = false;
+        this.followingDirectCommand = false;
+        this.interactionTarget = null;
 
         if (this.arrowRenderingLoc != null) {
             listener.addArrowRenderer(this.arrowRenderingLoc);
