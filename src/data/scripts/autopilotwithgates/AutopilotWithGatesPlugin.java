@@ -223,8 +223,12 @@ public class AutopilotWithGatesPlugin extends BaseModPlugin {
             this.layInCourseFor(entry);
         }
 
-        if (this.followMouse) UiUtil.setFollowMouseTrue(Global.getSector().getCampaignUI());
-        else if (this.followingDirectCommand && this.interactionTarget != null) UiUtil.followEntity(Global.getSector().getCampaignUI(), this.interactionTarget);
+        if (this.followMouse) {
+            UiUtil.setFollowMouseTrue(Global.getSector().getCampaignUI());
+        } else if (this.followingDirectCommand) {
+            if (this.interactionTarget != null) UiUtil.followEntity(Global.getSector().getCampaignUI(), this.interactionTarget);
+            else UiUtil.setFollowMouseTrue(Global.getSector().getCampaignUI());
+        }
 
         this.followMouse = false;
         this.followingDirectCommand = false;
