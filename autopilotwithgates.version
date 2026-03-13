@@ -3,11 +3,11 @@
   "modThreadId": "34642",
   "masterVersionFile": "https://raw.githubusercontent.com/rolfosian/SS-AutopilotWithGates/main/autopilotwithgates.version",
   "changelogURL": "https://raw.githubusercontent.com/rolfosian/SS-AutopilotWithGates/main/changelog.txt",
-  "directDownloadURL": "https://github.com/rolfosian/SS-AutopilotWithGates/releases/download/v0.0.6a/Autopilot.With.Gates.0.0.6a.zip",
+  "directDownloadURL": "https://github.com/rolfosian/SS-AutopilotWithGates/releases/download/v0.0.6b/Autopilot.With.Gates.0.0.6b.zip",
   "modVersion":
     {
       "major": "0",
       "minor": "0",
-      "patch": "6a"
+      "patch": "6b"
     }
 }

@@ -35,3 +35,7 @@ Version 0.0.6
 Version 0.0.6a
 
 - Made it so autopilot doesn't resume automated course after saving the game if player is manually navigating while having a course set to a target **in system**
+
+Version 0.0.6b
+
+- Fixed bug introduced with last patch that made it so autopilot was overriding the interaction target if the player fleet was following a direct command when game saved
