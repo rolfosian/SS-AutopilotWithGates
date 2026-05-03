@@ -1024,6 +1024,8 @@ public class UiUtil implements Opcodes {
     private static final VarHandle coreUIAbilityPanelVarHandle;
     private static final VarHandle abilitySlotsVarHandle;
     private static final VarHandle intelTabPlanetsPanelMapHandle;
+    public static final VarHandle abilityPanelPrevButtonHandle;
+    public static final VarHandle abilityPanelNextButtonHandle;
 
     private static final CallSite actionListenerCallSite;
 
@@ -1076,6 +1078,33 @@ public class UiUtil implements Opcodes {
                 "slots",
                 AbilitySlot[][].class
             );
+
+            String[] buttonFieldNames = getPrevNextButtonFieldNames(abilityPanelClass);
+            MethodHandles.Lookup privateLookup = MethodHandles.privateLookupIn(abilityPanelClass, lookup);
+
+            String prevButtonName = buttonFieldNames[0];
+            String nextButtonName = buttonFieldNames[1];
+            VarHandle prevHandle = null;
+            VarHandle nextHandle = null;
+            for (Object field : abilityPanelClass.getDeclaredFields()) {
+                String name = Refl.getFieldName(field);
+
+                if (name.equals(prevButtonName)) {
+                    prevHandle = privateLookup.findVarHandle(
+                        abilityPanelClass,
+                        name,
+                        Refl.getFieldType(field)
+                    );
+                } else if (name.equals(nextButtonName)) {
+                    nextHandle = privateLookup.findVarHandle(
+                        abilityPanelClass,
+                        name,
+                        Refl.getFieldType(field)
+                    );
+                }
+            }
+            abilityPanelPrevButtonHandle = prevHandle;
+            abilityPanelNextButtonHandle = nextHandle;
             
             MethodType factoryType = MethodType.methodType(actionListenerInterface, ActionListenerProxy.class);
             MethodType actualSamMethodType = MethodType.methodType(void.class, Object.class, Object.class);
@@ -1302,7 +1331,36 @@ public class UiUtil implements Opcodes {
         return foundName[0];
     }
 
-    // private static String get
+    private static String[] getPrevNextButtonFieldNames(Class<?> abilityPanelClass) {
+        Object inputStream = Refl.getMethodAndInvokeDirectly(
+            "getResourceAsStream",
+            abilityPanelClass.getClassLoader(),
+            abilityPanelClass.getCanonicalName().replace(".", "/") + ".class"
+        );
+
+        ClassReader cr = new ClassReader(readStream(inputStream));
+        final String[] fields = new String[9];
+
+        cr.accept(new ClassVisitor(ASM9) {
+            int getFields = 0;
+
+            @Override
+            public MethodVisitor visitMethod(int access, String name, String desc, String sig, String[] ex) {
+                if (!name.equals("actionPerformed")) return null;
+    
+                return new MethodVisitor(ASM9) {
+                    @Override
+                    public void visitFieldInsn(int opcode, String owner, String fld, String fldDesc) {
+                        if (opcode == GETFIELD) {
+                            fields[getFields++] = fld;
+                        }
+                    }
+                };
+            }
+        }, 0);
+
+        return new String[]{fields[7], fields[8]};
+    }
 
     private static String[] getZoomTrackerMethodNames(Class<?> zoomTrackerClass) {
         Object inputStream = Refl.getMethodAndInvokeDirectly(
