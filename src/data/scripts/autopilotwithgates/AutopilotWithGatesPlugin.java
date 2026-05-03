@@ -154,7 +154,7 @@ public class AutopilotWithGatesPlugin extends BaseModPlugin {
     
                 @Override
                 public void advance(float arg0) {
-                    if (f++ < 11) return;
+                    if (++f < 2) return;
                     
                     Object core = UiUtil.getCore(sector.getCampaignUI(), sector.getCampaignUI().getCurrentInteractionDialog());
                     if (core == null) return;
