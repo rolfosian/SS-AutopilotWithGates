@@ -618,6 +618,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
 
     private class MapArrowRenderer extends BaseCustomUIPanelPlugin {
         private final UIPanelAPI map;
+        private SectorEntityToken nextStep;
 
         private float regularCourseArrowOffset;
         private float gateCourseCircleOffset;
@@ -630,30 +631,26 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
 
         @Override
         public void advance(float deltaTime) {
-            if (self.entryGate == null || Global.getSector().getCampaignUI().getCurrentCourseTarget() == null) return;
-
-            Object courseWidget = utils.getCourseWidget(Global.getSector().getCampaignUI());
-            SectorEntityToken nextStep = utils.getNextStep(courseWidget, self.currentUltimateTarget);
-            if (nextStep == null) return;
+            if (this.nextStep == null || self.entryGate == null || Global.getSector().getCampaignUI().getCurrentCourseTarget() == null) return;
 
             CampaignFleetAPI playerFleet = Global.getSector().getPlayerFleet();
 
             Vector2f playerLocation = playerFleet.getLocation();
-            Vector2f targetLocation = nextStep.getLocation();
+            Vector2f targetLocation = this.nextStep.getLocation();
 
             BaseLocation mapLoc = utils.mapGetLocation(this.map);
             LocationAPI campaignMapLoc = CampaignEngine.getInstance().getUIData().getCampaignMapLocation();
             boolean isHyperSpace = (mapLoc != null && mapLoc.isHyperspace()) || (campaignMapLoc != null && campaignMapLoc.isHyperspace());
 
-            if (mapLoc != nextStep.getContainingLocation()) {
-                nextStep = self.currentUltimateTarget;
+            if (mapLoc != this.nextStep.getContainingLocation()) {
+                this.nextStep = self.currentUltimateTarget;
 
                 playerLocation = playerFleet.getLocationInHyperspace();
-                targetLocation = nextStep.getLocationInHyperspace();
+                targetLocation = this.nextStep.getLocationInHyperspace();
 
             } else if (isHyperSpace) {
                 playerLocation = playerFleet.getLocationInHyperspace();
-                targetLocation = nextStep.getLocationInHyperspace();
+                targetLocation = this.nextStep.getLocationInHyperspace();
             }
 
             if (isHyperSpace) {
@@ -683,9 +680,8 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
         public void render(float alphaMult) {
             if (self.entryGate == null || Global.getSector().getCampaignUI().getCurrentCourseTarget() == null) return;
 
-            Object courseWidget = utils.getCourseWidget(Global.getSector().getCampaignUI());
-            SectorEntityToken nextStep = utils.getNextStep(courseWidget, self.currentUltimateTarget);
-            if (nextStep == null) return;
+            this.nextStep = utils.getNextStep(utils.getCourseWidget(Global.getSector().getCampaignUI()), self.currentUltimateTarget);
+            if (this.nextStep == null) return;
 
             Object zoomTracker = utils.getZoomTracker(this.map);
             float maxZoomFactor = utils.getMaxZoomFactor(zoomTracker);
@@ -697,7 +693,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
             boolean shouldRenderRegularCourse = true;
 
             Vector2f playerLocation = playerFleet.getLocation();
-            Vector2f targetLocation = nextStep.getLocation();
+            Vector2f targetLocation = this.nextStep.getLocation();
 
             boolean isStar = false;
             if (isHyperSpace && self.currentUltimateTarget.isInHyperspace() && self.currentUltimateTarget instanceof JumpPointAPI jumpPoint && !jumpPoint.getDestinations().isEmpty()) {
@@ -707,24 +703,24 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                         isStar = true;
 
                         playerLocation = playerFleet.getLocationInHyperspace();
-                        nextStep = destination.getStarSystem().getStar();
-                        targetLocation = nextStep.getLocationInHyperspace();
+                        this.nextStep = destination.getStarSystem().getStar();
+                        targetLocation = this.nextStep.getLocationInHyperspace();
                     }
                 }
                 
             }
             
-            if (!isStar && nextStep.isInHyperspace() && nextStep instanceof JumpPointAPI jumpPoint && !jumpPoint.getDestinations().isEmpty()) {
+            if (!isStar && this.nextStep.isInHyperspace() && this.nextStep instanceof JumpPointAPI jumpPoint && !jumpPoint.getDestinations().isEmpty()) {
                 SectorEntityToken destination = jumpPoint.getDestinations().get(0).getDestination();
                 if (destination != null && destination.getStarSystem() != null) {
-                    nextStep = destination.getStarSystem().getHyperspaceAnchor();
-                    targetLocation = nextStep.getLocationInHyperspace();
+                    this.nextStep = destination.getStarSystem().getHyperspaceAnchor();
+                    targetLocation = this.nextStep.getLocationInHyperspace();
                 }
             }
 
             BaseLocation mapLoc = utils.mapGetLocation(this.map);
 
-            if (!isStar && mapLoc != nextStep.getContainingLocation()) {
+            if (!isStar && mapLoc != this.nextStep.getContainingLocation()) {
                 if (!isHyperSpace || mapLoc == null) return;
                 if (self.noExitJumpPoints) shouldRenderRegularCourse = false;
 
