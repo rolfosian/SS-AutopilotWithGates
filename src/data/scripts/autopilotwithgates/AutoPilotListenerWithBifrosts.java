@@ -105,7 +105,7 @@ public class AutoPilotListenerWithBifrosts extends AutoPilotListener {
             bestExit = exitNormGate;
         }
 
-        if (!(this.entryGate == bestEntry && this.exitGate == bestExit)) {
+        if (!(this.entryGate.gate == bestEntry.gate && this.exitGate.gate == bestExit.gate)) {
             boolean followMouse = campaignUI.isPlayerFleetFollowingMouse();
             boolean isFollowingDirectCommand = campaignUI.isFollowingDirectCommand();
             SectorEntityToken interactionTarget = playerFleet.getInteractionTarget();
