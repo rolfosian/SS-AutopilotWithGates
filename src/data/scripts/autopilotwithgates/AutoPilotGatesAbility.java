@@ -29,6 +29,7 @@ import com.fs.starfarer.api.ui.UIPanelAPI;
 
 import com.fs.starfarer.api.util.Misc;
 
+import data.scripts.autopilotwithgates.util.CampaignEntityPickerInstantiator.DialogDismissedListener;
 import data.scripts.autopilotwithgates.util.UiUtil;
 import static data.scripts.autopilotwithgates.util.UiUtil.utils;
 
@@ -38,6 +39,13 @@ import static data.scripts.autopilotwithgates.util.CampaignEntityPickerInstantia
 
 public class AutoPilotGatesAbility extends BaseToggleAbility {
     private static boolean isShowingEntityPicker = false;
+
+    private static final Object dialogDismissed = new DialogDismissedListener() {
+        @Override
+        public void dialogDismissed(Object dialog, int yesOrNo) {
+            isShowingEntityPicker = false;
+        }
+    }.getProxy();
 
     public AutoPilotGatesAbility() {
         super();
@@ -66,7 +74,7 @@ public class AutoPilotGatesAbility extends BaseToggleAbility {
 
         UIPanelAPI entityPickerDialog = showCampaignEntityPicker(
             utils.campaignUIGetScreenPanel(campaignUI),
-            null,
+            dialogDismissed,
             "Choose a Gate to add to Blacklist",
             "",
             "Confirm",
@@ -136,7 +144,7 @@ public class AutoPilotGatesAbility extends BaseToggleAbility {
             
         UIPanelAPI entityPickerDialog = showCampaignEntityPicker(
             utils.campaignUIGetScreenPanel(campaignUI),
-            null,
+            dialogDismissed,
             "Choose a Gate to remove From Blacklist",
             "",
             "Confirm",

@@ -72,7 +72,7 @@ public class CampaignEntityPickerInstantiator {
 
     public static UIPanelAPI showCampaignEntityPicker(
         UIPanelAPI dialogParent, // Choose between an InteractionDialog itself, CampaignState's getScreenPanel(), CoreUI's getScreenPanel(), or a core tab's getDialogParent() return value
-        DialogDismissedListener dialogDismissedListener, // might as well be null with campaignEntityPickerListener's functionality tbh. If you want to use this then pass the return value of DialogDismissedListener.getProxy() 
+        Object dialogDismissedListener, // might as well be null with campaignEntityPickerListener's functionality tbh. If you want to use this then pass the return value of DialogDismissedListener.getProxy() 
         String title,
         String selectedText,
         String okText,
@@ -88,7 +88,7 @@ public class CampaignEntityPickerInstantiator {
                 factionForUiColors,
                 entities,
                 dialogParent,
-                dialogDismissedListener == null ? null : dialogDismissedListener.getProxy(),
+                dialogDismissedListener,
                 campaignEntityPickerListener
             );
 
@@ -107,6 +107,7 @@ public class CampaignEntityPickerInstantiator {
             this.listener = listener;
         }
 
+        @SuppressWarnings("unused")
         // @Override
         public void dialogDismissed(Object arg0, int arg1) {
             this.listener.dialogDismissed(arg0, arg1);
