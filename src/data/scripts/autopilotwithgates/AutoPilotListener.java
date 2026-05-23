@@ -301,7 +301,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
             }
         }
         this.exitGate = GateFinder.getNearestGate(systemGateData, ultimateTarget);
-        this.entryGate = GateFinder.getNearestGateToPlayerOutsideLocation(systemGateData, this.exitGate.gate, this.currentUltimateTarget);
+        this.entryGate = this.exitGate != null ? GateFinder.getNearestGateToPlayerOutsideLocation(systemGateData, this.exitGate.gate, this.currentUltimateTarget) : null;
 
         if (this.entryGate != null && this.exitGate != null) {
             boolean followMouse = campaignUI.isPlayerFleetFollowingMouse();
