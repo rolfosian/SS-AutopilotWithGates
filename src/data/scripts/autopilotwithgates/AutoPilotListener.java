@@ -34,6 +34,7 @@ import com.fs.starfarer.api.campaign.StarSystemAPI;
 import com.fs.starfarer.api.campaign.comm.CommMessageAPI.MessageClickAction;
 import com.fs.starfarer.api.campaign.listeners.ListenerUtil;
 import com.fs.starfarer.api.campaign.rules.MemoryAPI;
+
 import com.fs.starfarer.api.impl.campaign.GateEntityPlugin;
 import com.fs.starfarer.api.impl.campaign.rulecmd.missions.GateCMD;
 
@@ -42,17 +43,19 @@ import com.fs.starfarer.api.ui.ButtonAPI;
 import com.fs.starfarer.api.ui.CustomPanelAPI;
 import com.fs.starfarer.api.ui.PositionAPI;
 import com.fs.starfarer.api.ui.TooltipMakerAPI;
-import com.fs.starfarer.api.ui.UIPanelAPI;
 import com.fs.starfarer.api.ui.UIComponentAPI;
+import com.fs.starfarer.api.ui.UIPanelAPI;
 
 import com.fs.starfarer.api.util.Misc;
 
 import data.scripts.autopilotwithgates.util.GateAutoPilotRuleMemory;
 import data.scripts.autopilotwithgates.util.GateFinder;
-import data.scripts.autopilotwithgates.util.UiUtil;
 import data.scripts.autopilotwithgates.util.TreeTraverser;
 import data.scripts.autopilotwithgates.util.TreeTraverser.TreeNode;
+import data.scripts.autopilotwithgates.util.UiUtil;
 import static data.scripts.autopilotwithgates.util.UiUtil.utils;
+
+import static data.scripts.autopilotwithgates.AutopilotWithGatesPlugin.systemGateData;
 
 import lunalib.lunaSettings.LunaSettings;
 
@@ -67,37 +70,43 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
         logger.info(sb.toString());
     }
 
-    private static final EnumSet<CampaignEngineLayers> layers = EnumSet.of(CampaignEngineLayers.FLEETS);
-    private static final Color DARK_RED = new Color(139, 0, 0);
-    private static final Color DARK_GREEN = new Color(0, 139, 0);
-    public static final SpriteAPI arrow = Global.getSettings().getSprite("graphics/warroom/ship_arrow.png");
-    public static final SpriteAPI gateCircle = Global.getSettings().getSprite("graphics/icons/gate0.png");
+    protected static final EnumSet<CampaignEngineLayers> layers = EnumSet.of(CampaignEngineLayers.FLEETS);
+    protected static final Color DARK_RED = new Color(139, 0, 0);
+    protected static final Color DARK_GREEN = new Color(0, 139, 0);
+    
+    protected static final SpriteAPI arrow = Global.getSettings().getSprite("graphics/warroom/ship_arrow.png");
+    protected static final SpriteAPI gateCircle = Global.getSettings().getSprite("graphics/icons/gate0.png");
 
-    private final boolean autoJump;
-    private final AutoPilotListener self = this;
-    private AutoPilotGatesAbility ability;
+    protected final boolean autoJump;
+    protected final AutoPilotListener self = this;
+    protected AutoPilotGatesAbility ability;
 
+    private final Set<String> blacklist;
     private final List<Object> messageDisplayList;
 
-    private SectorEntityToken currentUltimateTarget;
-    private CustomCampaignEntityAPI entryGate;
-    private CustomCampaignEntityAPI exitGate;
+    protected SectorEntityToken currentUltimateTarget;
+    protected GateData entryGate;
+    protected GateData exitGate;
 
-    private boolean postGateJump = false;
-    private boolean abilityActive = false;
-    private boolean wasJustActivated = true;
-    private boolean wasJustGotCloserThanGate = false;
+    protected boolean postGateJump = false;
+    protected boolean abilityActive = false;
+    protected boolean wasJustActivated = true;
+    protected boolean wasJustGotCloserThanGate = false;
 
-    private boolean noExitJumpPoints = true;
-    private boolean renderingArrow = false;
-    private BaseLocation arrowRenderingLoc;
-    private Color arrowColor = DARK_RED;
+    protected boolean noExitJumpPoints = true;
+    protected boolean renderingArrow = false;
+    protected BaseLocation arrowRenderingLoc;
+    protected Color arrowColor = DARK_RED;
+    protected Color gateArrowColor = Misc.getBasePlayerColor();
 
-    private final Maps maps = new Maps();
+    protected final Maps maps = new Maps();
 
-    public AutoPilotListener(boolean abilityActive) {
+    @SuppressWarnings("unchecked")
+    protected AutoPilotListener(boolean abilityActive) {
         super(false);
         this.abilityActive = abilityActive;
+
+        this.blacklist = (Set<String>) Global.getSector().getPersistentData().computeIfAbsent("$apwgBlacklist", key -> new HashSet<>());
         
         if (Global.getSettings().getModManager().isModEnabled("lunalib")) {
             this.autoJump = LunaSettings.getBoolean("autopilot_with_gates", "autoJump");
@@ -112,8 +121,34 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
         this.messageDisplayList = UiUtil.getMessageDisplayList(Global.getSector().getCampaignUI());
     }
 
+    protected void reset() {
+        if (!this.maps.isEmpty()) maps.clear();
+        if (this.renderingArrow) removeArrowRenderer();
+
+        this.currentUltimateTarget = null;
+        this.entryGate = null;
+        this.exitGate = null;
+    }
+
+    protected void resetAfterBlacklist(CampaignUIAPI campaignUI) {
+        if (this.entryGate != null) {
+            this.entryGate = null;
+            this.exitGate = null;
+
+            boolean followMouse = campaignUI.isPlayerFleetFollowingMouse();
+            boolean isFollowingDirectCommand = campaignUI.isFollowingDirectCommand();
+            SectorEntityToken interactionTarget = Global.getSector().getPlayerFleet().getInteractionTarget();
+
+            this.layInCourseFor(this.currentUltimateTarget);
+            this.currentUltimateTarget = null;
+            
+            this.wasJustActivated = true;
+            this.handleMouseStatus(followMouse, isFollowingDirectCommand, interactionTarget, campaignUI);
+        }
+    }
+
     @Override
-    public void advance(float arg0) {
+    public void advance(float dt) {
         if (!this.abilityActive) return;
 
         CampaignUIAPI campaignUI = Global.getSector().getCampaignUI();
@@ -121,12 +156,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
 
         SectorEntityToken ultimateTarget = campaignUI.getUltimateCourseTarget();
         if (ultimateTarget == null) {
-            if (!this.maps.isEmpty()) maps.clear();
-            if (this.renderingArrow) removeArrowRenderer();
-
-            this.currentUltimateTarget = null;
-            this.entryGate = null;
-            this.exitGate = null;
+            this.reset();
             return;
         }
 
@@ -145,10 +175,8 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
             if (!this.maps.isEmpty()) this.maps.clear();
         }
         
-        if (ultimateTarget == this.entryGate) {
-            if (GateFinder.getCombinedFuelCost(playerFleet, this.entryGate, this.exitGate, this.currentUltimateTarget)
-                > GateFinder.getFuelCostToUltimateTarget(playerFleet, this.currentUltimateTarget)) this.arrowColor = DARK_GREEN;
-            else this.arrowColor = DARK_RED;
+        if (this.entryGate != null && ultimateTarget == this.entryGate.gate) {
+            setArrowColor(playerFleet);
 
             Object core = null;
             CoreUITabId currentCoreTabId = campaignUI.getCurrentCoreTab();
@@ -195,48 +223,73 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                 }
             }
 
+            if (AutoPilotGatesAbility.isShowingEntityPicker()) mapsPresent = true;
             if (!mapsPresent && !this.maps.isEmpty()) this.maps.clear();
-            if (!playerFleet.isInHyperspace()) return;
-
-            CustomCampaignEntityAPI newEntryGate = GateFinder.getNearestGateToPlayerOutsideLocation(this.exitGate, this.currentUltimateTarget);
-            if (newEntryGate != null) {
-                if (this.entryGate != newEntryGate) {
-                    this.entryGate = newEntryGate;
-
-                    boolean followMouse = campaignUI.isPlayerFleetFollowingMouse();
-                    this.layInCourseFor(newEntryGate);
-                    
-                    if (followMouse) UiUtil.setFollowMouseTrue(campaignUI);
-                }
-                return;
-
-            } else {
-                boolean followMouse = campaignUI.isPlayerFleetFollowingMouse();
-                this.layInCourseFor(this.currentUltimateTarget);
-                
-                if (followMouse) UiUtil.setFollowMouseTrue(campaignUI);
-
-                this.entryGate = null;
-                this.exitGate = null;
-                this.currentUltimateTarget = null;
-                this.wasJustGotCloserThanGate = true;
-                return;
-            }
+            this.findNewEntryGate(campaignUI, playerLoc, playerFleet);
+            return;
         }
+        this.findGates(campaignUI, playerLoc, playerFleet, ultimateTarget);
+    }
 
+    protected void handleMouseStatus(boolean followMouse, boolean isFollowingDirectCommand, SectorEntityToken interactionTarget, CampaignUIAPI campaignUI) {
+        if (followMouse) {
+            UiUtil.setFollowMouseTrue(Global.getSector().getCampaignUI());
+        } else if (isFollowingDirectCommand) {
+            if (interactionTarget != null) UiUtil.followEntity(campaignUI, interactionTarget);
+            else UiUtil.setFollowMouseTrue(Global.getSector().getCampaignUI());
+        }
+    }
+
+    protected void findNewEntryGate(CampaignUIAPI campaignUI, LocationAPI playerLoc, CampaignFleetAPI playerFleet) {
+        if (!playerFleet.isInHyperspace()) return;
+
+        GateData newEntryGate = GateFinder.getNearestGateToPlayerOutsideLocation(systemGateData, this.exitGate.gate, this.currentUltimateTarget);
+        if (newEntryGate != null) {
+            if (this.entryGate.gate != newEntryGate.gate) {
+                this.entryGate = newEntryGate;
+
+                boolean followMouse = campaignUI.isPlayerFleetFollowingMouse();
+                boolean isFollowingDirectCommand = campaignUI.isFollowingDirectCommand();
+                SectorEntityToken interactionTarget = playerFleet.getInteractionTarget();
+
+                this.layInCourseFor(newEntryGate.gate);
+                this.handleMouseStatus(followMouse, isFollowingDirectCommand, interactionTarget, campaignUI);
+            }
+
+        } else {
+            boolean followMouse = campaignUI.isPlayerFleetFollowingMouse();
+            boolean isFollowingDirectCommand = campaignUI.isFollowingDirectCommand();
+            SectorEntityToken interactionTarget = playerFleet.getInteractionTarget();
+
+            this.layInCourseFor(interactionTarget);
+            this.handleMouseStatus(followMouse, isFollowingDirectCommand, interactionTarget, campaignUI);
+
+            this.entryGate = null;
+            this.exitGate = null;
+            this.currentUltimateTarget = null;
+            this.wasJustGotCloserThanGate = true;
+        }
+    }
+
+    protected void findGates(CampaignUIAPI campaignUI, LocationAPI playerLoc, CampaignFleetAPI playerFleet, SectorEntityToken ultimateTarget) {
         this.currentUltimateTarget = ultimateTarget;
 
         if (playerLoc instanceof StarSystemAPI) {
             this.entryGate = GateFinder.getNearestGateInLocation(playerLoc, playerFleet.getLocation());
 
             if (this.entryGate != null) {
-                this.exitGate = GateFinder.getNearestGate(ultimateTarget);
+                this.exitGate = GateFinder.getNearestGate(systemGateData, ultimateTarget);
 
                 if (this.exitGate != null) {
+                    boolean isFollowingDirectCommand = campaignUI.isFollowingDirectCommand();
                     boolean followMouse = campaignUI.isPlayerFleetFollowingMouse();
-                    this.layInCourseFor(this.entryGate);
+                    SectorEntityToken interactionTarget = playerFleet.getInteractionTarget();
 
-                    if (this.wasJustActivated && followMouse) UiUtil.setFollowMouseTrue(campaignUI);
+                    this.layInCourseFor(this.entryGate.gate);
+
+                    if (this.wasJustActivated) {
+                        this.handleMouseStatus(followMouse, isFollowingDirectCommand, interactionTarget, campaignUI);
+                    }
 
                     this.wasJustActivated = false;
                     this.wasJustGotCloserThanGate = false;
@@ -247,14 +300,19 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                 return;
             }
         }
-        this.exitGate = GateFinder.getNearestGate(ultimateTarget);
-        this.entryGate = GateFinder.getNearestGateToPlayerOutsideLocation(this.exitGate, this.currentUltimateTarget);
+        this.exitGate = GateFinder.getNearestGate(systemGateData, ultimateTarget);
+        this.entryGate = GateFinder.getNearestGateToPlayerOutsideLocation(systemGateData, this.exitGate.gate, this.currentUltimateTarget);
 
         if (this.entryGate != null && this.exitGate != null) {
             boolean followMouse = campaignUI.isPlayerFleetFollowingMouse();
-            this.layInCourseFor(this.entryGate);
+            boolean isFollowingDirectCommand = campaignUI.isFollowingDirectCommand();
+            SectorEntityToken interactionTarget = playerFleet.getInteractionTarget();
 
-            if ((this.wasJustActivated || this.wasJustGotCloserThanGate) && followMouse) UiUtil.setFollowMouseTrue(campaignUI);
+            this.layInCourseFor(this.entryGate.gate);
+
+            if (this.wasJustActivated || this.wasJustGotCloserThanGate) {
+                this.handleMouseStatus(followMouse, isFollowingDirectCommand, interactionTarget, campaignUI);
+            }
 
             this.wasJustGotCloserThanGate = false;
             this.wasJustActivated = false;
@@ -265,6 +323,15 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
         this.entryGate = null;
         this.exitGate = null;
         return;
+    }
+
+    protected boolean isGateFuelCostMore(CampaignFleetAPI playerFleet) {
+        return GateFinder.getCombinedFuelCost(playerFleet, this.entryGate.gate, this.exitGate.gate, this.currentUltimateTarget)
+                > GateFinder.getFuelCostToUltimateTarget(playerFleet, this.currentUltimateTarget);
+    }
+
+    protected void setArrowColor(CampaignFleetAPI playerFleet) {
+        this.arrowColor = isGateFuelCostMore(playerFleet) ? DARK_GREEN : DARK_RED;
     }
 
     @Override
@@ -281,14 +348,14 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
     public void reportShownInteractionDialog(InteractionDialogAPI dialog) {
         SectorEntityToken interactionTarget = dialog.getInteractionTarget();
 
-        if (interactionTarget != null && interactionTarget == this.entryGate) {
-            int cost = GateCMD.computeFuelCost(this.exitGate);
+        if (interactionTarget != null && this.entryGate != null && interactionTarget == this.entryGate.gate) {
+            int cost = GateCMD.computeFuelCost(this.exitGate.gate);
             int available = (int) Global.getSector().getPlayerFleet().getCargo().getFuel();
 
             if (cost <= available) {
-                CustomCampaignEntityAPI entry = entryGate;
-                CustomCampaignEntityAPI exit = exitGate;
-                SectorEntityToken ultimateTarget = currentUltimateTarget;
+                CustomCampaignEntityAPI entry = this.entryGate.gate;
+                CustomCampaignEntityAPI exit = this.exitGate.gate;
+                SectorEntityToken ultimateTarget = this.currentUltimateTarget;
 
                 Runnable jump = new Runnable() {
                     @Override
@@ -302,14 +369,11 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                         JumpDestination dest = new JumpDestination(exit, null);
                         Global.getSector().doHyperspaceTransition(playerFleet, interactionTarget, dest, 2f);
                         
+
                         float distLY = Misc.getDistanceLY(exit, entry);
-                        
-                        GateEntityPlugin plugin = (GateEntityPlugin) exit.getCustomPlugin();
-                        plugin.showBeingUsed(distLY);
-                        
-                        plugin = (GateEntityPlugin) entry.getCustomPlugin();
-                        plugin.showBeingUsed(distLY);
-                        
+                        ((GateEntityPlugin) exit.getCustomPlugin()).showBeingUsed(distLY);
+                        ((GateEntityPlugin) entry.getCustomPlugin()).showBeingUsed(distLY);
+                            
                         ListenerUtil.reportFleetTransitingGate(playerFleet, interactionTarget, exit);
 
                         // AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
@@ -414,7 +478,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                 return;
 
             } else {
-                CustomCampaignEntityAPI exit = this.exitGate;
+                CustomCampaignEntityAPI exit = this.exitGate.gate;
                 dialog.getOptionPanel().addOption(
                     "Travel through the Gate to " + exit.getContainingLocation().getName(),
                     "gateAutoPilotRule"
@@ -442,7 +506,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
         else this.noExitJumpPoints = false;
     }
 
-    private void layInCourseFor(SectorEntityToken target) {
+    protected void layInCourseFor(SectorEntityToken target) {
         int messageDisplayListSize = this.messageDisplayList.size();
         Global.getSector().layInCourseFor(target);
         if (this.messageDisplayList.size() > messageDisplayListSize) this.messageDisplayList.remove(this.messageDisplayList.size()-1);
@@ -485,11 +549,11 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
         return this.ability;
     }
 
-    public CustomCampaignEntityAPI getEntryGate() {
+    public GateData getEntryGate() {
         return this.entryGate;
     }
 
-    public CustomCampaignEntityAPI getExitGate() {
+    public GateData getExitGate() {
         return this.exitGate;
     }
 
@@ -612,8 +676,16 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
         }
     }
 
-    public Map<UIPanelAPI, CustomPanelAPI> getMaps() {
+    public Maps getMaps() {
         return this.maps;
+    }
+
+    public Set<String> getBlacklist() {
+        return this.blacklist;
+    }
+
+    public boolean isBlacklisted(SectorEntityToken gate) {
+        return this.blacklist.contains(gate.getId());
     }
 
     private class MapArrowRenderer extends BaseCustomUIPanelPlugin {
@@ -665,13 +737,13 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
         }
 
         private void advanceGateCircleOffset(float deltaTime) {
-            float distance = distanceBetween(self.entryGate.getLocationInHyperspace(), self.exitGate.getLocationInHyperspace());
+            float distance = distanceBetween(self.entryGate.gate.getLocationInHyperspace(), self.exitGate.gate.getLocationInHyperspace());
             if (distance < 1000.0F) distance = 1000.0F;
             for (this.gateCourseCircleOffset += deltaTime * 0.1F * 10000.0F / distance; this.gateCourseCircleOffset > 1.0F; --this.gateCourseCircleOffset);
         }
 
         private void advanceGateCourseLastLegOffset(float deltaTime) {
-            float distance = distanceBetween(self.exitGate.getLocationInHyperspace(), self.currentUltimateTarget.getLocationInHyperspace());
+            float distance = distanceBetween(self.exitGate.gate.getLocationInHyperspace(), self.currentUltimateTarget.getLocationInHyperspace());
             if (distance < 1000.0F) distance = 1000.0F;
             for (this.gateCourseLastLegOffset += deltaTime * 0.1F * 10000.0F / distance; this.gateCourseLastLegOffset > 1.0F; --this.gateCourseLastLegOffset);
         }
@@ -793,10 +865,10 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
             }
 
             if (isHyperSpace) {
-                playerLocation = self.entryGate.getLocationInHyperspace();
-                targetLocation = self.exitGate.getLocationInHyperspace();
+                playerLocation = self.entryGate.gate.getLocationInHyperspace();
+                targetLocation = self.exitGate.gate.getLocationInHyperspace();
 
-                Color gateArrowColor = Misc.getBasePlayerColor();
+                Color gateArrowColor = self.gateArrowColor;
 
                 if (distanceBetween(playerLocation, targetLocation) >= 1000f) {
                     arrowSize = 10.0F;
@@ -832,8 +904,8 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
 
                 if ((self.currentUltimateTarget.isInHyperspace()
                     && self.currentUltimateTarget instanceof JumpPointAPI jp
-                    && jp.getDestinationStarSystem() == self.exitGate.getContainingLocation())    
-                || self.currentUltimateTarget.getContainingLocation() == self.exitGate.getContainingLocation()) {
+                    && jp.getDestinationStarSystem() == self.exitGate.gate.getContainingLocation())
+                || self.currentUltimateTarget.getContainingLocation() == self.exitGate.gate.getContainingLocation()) {
                     GL11.glPopMatrix();
                     return;
                 }
@@ -928,7 +1000,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
         }
     }
 
-    private final class Maps extends HashMap<UIPanelAPI, CustomPanelAPI> {
+    protected final class Maps extends HashMap<UIPanelAPI, CustomPanelAPI> {
         @Override
         public void clear() {
             for (Map.Entry<UIPanelAPI, CustomPanelAPI> entry : this.entrySet()) {

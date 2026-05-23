@@ -1,5 +1,8 @@
 {
     "gateAutopilot_LY_DIST_TOLERANCE" : "0.2",
-    "gateAutopilot_autoJump" : false,
-    "gateAutopilot_abilityScroll" : false 
+    
+    # If lunalib is enabled, use Luna Settings in game instead for these options
+    "gateAutopilot_autoJump" : false, # If true, autopilot jumps automatically when reaching gates
+    "gateAutopilot_abilityScroll" : false , # If true, enables mouse wheel scrolling of ability bars
+    "gateAutopilot_preferBifrostsInSystemsWithBoth" : false # If true, gate autopilot prefers AotD Bifrost gates if both connections are in the same systems and bifrosts are off cooldown (Only applicable if the AoTD VoK mod is enabled)
 }

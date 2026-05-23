@@ -5,6 +5,9 @@ import java.util.List;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
+
+import static data.scripts.autopilotwithgates.AutopilotWithGatesPlugin.listener;
+
 import java.lang.invoke.CallSite;
 import java.lang.invoke.LambdaMetafactory;
 import java.lang.invoke.MethodHandle;
@@ -12,8 +15,10 @@ import java.lang.invoke.MethodType;
 
 import org.apache.log4j.Logger;
 
+import com.fs.graphics.Sprite;
 import com.fs.graphics.util.Fader;
 import com.fs.starfarer.api.Global;
+import com.fs.starfarer.api.campaign.CampaignFleetAPI;
 import com.fs.starfarer.api.campaign.CampaignUIAPI;
 import com.fs.starfarer.api.campaign.SectorEntityToken;
 import com.fs.starfarer.api.campaign.comm.IntelInfoPlugin;
@@ -29,8 +34,12 @@ import com.fs.starfarer.campaign.CampaignState;
 import com.fs.starfarer.campaign.CampaignUIPersistentData.AbilitySlot;
 import com.fs.starfarer.campaign.CampaignUIPersistentData.AbilitySlots;
 import com.fs.starfarer.campaign.comms.v2.EventsPanel;
+import com.fs.starfarer.campaign.fleet.CampaignFleet;
+import com.fs.starfarer.ui.newui.CampaignEntityPickerDialog;
 
 import data.scripts.autopilotwithgates.org.objectweb.asm.*;
+import data.scripts.autopilotwithgates.util.UiUtil.ActionListener;
+import data.scripts.autopilotwithgates.util.UiUtil.UtilInterface;
 
 public class UiUtil implements Opcodes {
     private static final Logger logger = Logger.getLogger(UiUtil.class);
@@ -47,6 +56,9 @@ public class UiUtil implements Opcodes {
         public Object interactionDialogGetCore(Object interactionDialog);
         public Object campaignUIgetCore(Object campaignUI);
         public UIPanelAPI coreGetCurrentTab(Object core);
+
+        public UIPanelAPI campaignUIGetScreenPanel(Object campaignUI);
+        public UIPanelAPI confirmDialogGetInnerPanel(Object confirmDialog);
 
         public EventsPanel getEventsPanel(Object intelTab);
         public ButtonAPI intelTabGetPlanetsButton(Object intelTab);
@@ -106,6 +118,7 @@ public class UiUtil implements Opcodes {
         Class<?> toolTipClass = Refl.getReturnType(Refl.getMethod("getTooltip", uiComponentClass));
         String uiPanelInternalName = Type.getInternalName(uiPanelClass);
         String uiComponentInternalName = Type.getInternalName(uiComponentClass);
+        String confirmDialogInternalName = Type.getInternalName(CampaignEntityPickerDialog.class.getSuperclass());
 
         Class<?> buttonClass = Refl.getFieldType(Refl.getFieldByInterface(ButtonAPI.class, EventsPanel.class));
 
@@ -124,6 +137,7 @@ public class UiUtil implements Opcodes {
         String interfaceName = Type.getType(UtilInterface.class).getInternalName();
 
         String coreClassDesc = Type.getDescriptor(coreClass);
+        String uiPanelDesc = Type.getDescriptor(uiPanelClass);
         String mapTabDesc = Type.getDescriptor(mapTabClass);
         String sectorEntityTokenDesc = Type.getDescriptor(SectorEntityToken.class);
         String uiPanelAPIDesc = Type.getDescriptor(UIPanelAPI.class);
@@ -241,7 +255,7 @@ public class UiUtil implements Opcodes {
                 INVOKEVIRTUAL,
                 coreClassInternalName,
                 "getCurrentTab",
-                "()" + Type.getDescriptor(uiPanelClass),
+                "()" + uiPanelDesc,
                 false
             );
 
@@ -576,6 +590,66 @@ public class UiUtil implements Opcodes {
             );
 
             mv.visitInsn(FRETURN);
+
+            mv.visitMaxs(0, 0);
+            mv.visitEnd();
+        }
+
+        // public UIPanelAPI confirmDialogGetInnerPanel(Object confirmDialog) {
+        //     return ((ConfirmDialogClass)confirmDialog).getInnerPanel();
+        // }
+        {
+            MethodVisitor mv = cw.visitMethod(
+                ACC_PUBLIC,
+                "confirmDialogGetInnerPanel",
+                "(Ljava/lang/Object;)" + uiPanelAPIDesc,
+                null,
+                null
+            );
+            mv.visitCode();
+
+            mv.visitVarInsn(ALOAD, 1);
+            mv.visitTypeInsn(CHECKCAST, confirmDialogInternalName);
+
+            mv.visitMethodInsn(
+                INVOKEVIRTUAL,
+                confirmDialogInternalName,
+                "getInnerPanel",
+                "()" + uiPanelDesc,
+                false
+            );
+
+            mv.visitInsn(ARETURN);
+
+            mv.visitMaxs(0, 0);
+            mv.visitEnd();
+        }
+
+        // public UIPanelAPI campaignUIGetScreenPanel(Object campaignUI) {
+        //     return ((CampaignState)campaignUI).getScreenPanel();
+        // }
+        {
+            MethodVisitor mv = cw.visitMethod(
+                ACC_PUBLIC,
+                "campaignUIGetScreenPanel",
+                "(Ljava/lang/Object;)" + uiPanelAPIDesc,
+                null,
+                null
+            );
+            mv.visitCode();
+
+            mv.visitVarInsn(ALOAD, 1);
+            mv.visitTypeInsn(CHECKCAST, campaignStateInternalName);
+
+            mv.visitMethodInsn(
+                INVOKEVIRTUAL,
+                campaignStateInternalName,
+                "getScreenPanel",
+                "()" + uiPanelDesc,
+                false
+            );
+
+            mv.visitInsn(ARETURN);
 
             mv.visitMaxs(0, 0);
             mv.visitEnd();
@@ -1024,6 +1098,9 @@ public class UiUtil implements Opcodes {
     private static final VarHandle coreUIAbilityPanelVarHandle;
     private static final VarHandle abilitySlotsVarHandle;
     private static final VarHandle intelTabPlanetsPanelMapHandle;
+    private static final VarHandle campaignEntityPickerDialogMapHandle;
+    private static final VarHandle campaignFleetArrowHandle;
+
     public static final VarHandle abilityPanelPrevButtonHandle;
     public static final VarHandle abilityPanelNextButtonHandle;
 
@@ -1061,6 +1138,18 @@ public class UiUtil implements Opcodes {
                 mapTabClass
             );
 
+            campaignFleetArrowHandle = MethodHandles.privateLookupIn(CampaignFleet.class, lookup).findVarHandle(
+                CampaignFleet.class,
+                "arrow",
+                Sprite.class
+            );
+
+            campaignEntityPickerDialogMapHandle = MethodHandles.privateLookupIn(CampaignEntityPickerDialog.class, lookup).findVarHandle(
+                CampaignEntityPickerDialog.class,
+                "map",
+                mapTabClass
+            );
+
             coreUIAbilityPanelVarHandle = MethodHandles.privateLookupIn(coreClass, lookup).findVarHandle(
                 coreClass,
                 abilityPanelFieldName,
@@ -1082,8 +1171,8 @@ public class UiUtil implements Opcodes {
             String[] buttonFieldNames = getPrevNextButtonFieldNames(abilityPanelClass);
             MethodHandles.Lookup privateLookup = MethodHandles.privateLookupIn(abilityPanelClass, lookup);
 
-            String prevButtonName = buttonFieldNames[0];
-            String nextButtonName = buttonFieldNames[1];
+            String prevButtonName = buttonFieldNames[7];
+            String nextButtonName = buttonFieldNames[8];
             VarHandle prevHandle = null;
             VarHandle nextHandle = null;
             for (Object field : abilityPanelClass.getDeclaredFields()) {
@@ -1120,6 +1209,8 @@ public class UiUtil implements Opcodes {
                 actualSamMethodType
             );
 
+            CampaignEntityPickerInstantiator.init();
+
         } catch (Throwable e) {
             throw new RuntimeException(e);
         }
@@ -1143,6 +1234,10 @@ public class UiUtil implements Opcodes {
         return utils.mapTabGetMap(outerMap);
     }
 
+    public static UIPanelAPI getMapFromCampaignPickerDialog(Object campaignPickerDialog) {
+        return utils.mapTabGetMap(campaignEntityPickerDialogMapHandle.get(campaignPickerDialog));
+    }
+
     public static UIPanelAPI getIntelTabPlanetsPanelMap(UIPanelAPI planetsPanel) {
         Object mapParent = intelTabPlanetsPanelMapHandle.get(planetsPanel);
         return mapParent == null ? null : utils.mapTabGetMap(mapParent);
@@ -1153,6 +1248,14 @@ public class UiUtil implements Opcodes {
         Global.getSector().getPlayerFleet().setInteractionTarget(null);
 
         followMouseVarHandle.set(campaignUI, true);
+    }
+
+    public static void setFleetArrow(CampaignFleetAPI fleet, Sprite arrow) {
+        campaignFleetArrowHandle.set(fleet, arrow);
+    }
+
+    public static Sprite getFleetArrow(CampaignFleetAPI fleet) {
+        return (Sprite) campaignFleetArrowHandle.get(fleet);
     }
 
     public static void followEntity(CampaignUIAPI campaignUI, SectorEntityToken entity) {
@@ -1359,7 +1462,7 @@ public class UiUtil implements Opcodes {
             }
         }, 0);
 
-        return new String[]{fields[7], fields[8]};
+        return fields;
     }
 
     private static String[] getZoomTrackerMethodNames(Class<?> zoomTrackerClass) {

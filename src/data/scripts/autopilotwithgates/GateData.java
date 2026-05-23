@@ -2,27 +2,23 @@ package data.scripts.autopilotwithgates;
 
 import java.util.List;
 
+import com.fs.starfarer.api.campaign.*;
 import org.lwjgl.util.vector.Vector2f;
-
-import com.fs.starfarer.api.campaign.CustomCampaignEntityAPI;
-import com.fs.starfarer.api.campaign.PlanetAPI;
-import com.fs.starfarer.api.campaign.SectorEntityToken;
-import com.fs.starfarer.api.campaign.StarSystemAPI;
 
 import data.scripts.autopilotwithgates.util.GateFinder;
 
-/**
- * I cant be bothered implementing this
- */
 public class GateData {
+    public final StarSystemAPI system;
     public final CustomCampaignEntityAPI gate;
-    public final SectorEntityToken closestExit;
-    public final SectorEntityToken closestEntry;
 
-    public final float closestExitDistSq;
-    public final float closestEntryDistSq;
+    public SectorEntityToken closestExit;
+    public SectorEntityToken closestEntry;
+
+    public float closestExitDistSq;
+    public float closestEntryDistSq;
 
     public GateData(StarSystemAPI system, List<SectorEntityToken> jumpPoints, List<PlanetAPI> planets, boolean hasJumpPoints, boolean hasPlanets, CustomCampaignEntityAPI gate) {
+        this.system = system;
         this.gate = gate;
         Vector2f gateLoc = gate.getLocation();
 
