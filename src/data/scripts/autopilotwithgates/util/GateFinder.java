@@ -98,7 +98,7 @@ public class GateFinder {
     
     /** Returns null if exit gate is nearest gate to player or player is nearer to ultimate target*/
     public static GateData getNearestGateToPlayerOutsideLocation(List<SystemGateData> systemGateDatas, SectorEntityToken exitGate, SectorEntityToken ultimateTarget) {
-        if (ultimateTarget == null || exitGate == null) return null;
+        if (ultimateTarget == null) return null;
         CampaignFleetAPI playerFleet = Global.getSector().getPlayerFleet();
 
         Vector2f targetHyperspaceLoc = playerFleet.getLocationInHyperspace();
