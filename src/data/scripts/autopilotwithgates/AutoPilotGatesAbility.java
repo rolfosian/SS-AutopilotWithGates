@@ -1,6 +1,8 @@
 package data.scripts.autopilotwithgates;
 
 import java.awt.Color;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.VarHandle;
 import java.util.*;
 
 import org.lwjgl.input.Keyboard;
@@ -28,9 +30,12 @@ import com.fs.starfarer.api.ui.TooltipMakerAPI;
 import com.fs.starfarer.api.ui.UIPanelAPI;
 
 import com.fs.starfarer.api.util.Misc;
+import com.fs.starfarer.campaign.CampaignEngine;
+import com.fs.starfarer.ui.impl.StandardTooltipV2Expandable;
 
 import data.scripts.autopilotwithgates.util.CampaignEntityPickerInstantiator.DialogDismissedListener;
 import data.scripts.autopilotwithgates.util.UiUtil;
+
 import static data.scripts.autopilotwithgates.util.UiUtil.utils;
 
 import static data.scripts.autopilotwithgates.AutopilotWithGatesPlugin.listener;
@@ -38,12 +43,29 @@ import static data.scripts.autopilotwithgates.AutopilotWithGatesPlugin.isBifrost
 import static data.scripts.autopilotwithgates.util.CampaignEntityPickerInstantiator.showCampaignEntityPicker;
 
 public class AutoPilotGatesAbility extends BaseToggleAbility {
-    private static boolean isShowingEntityPicker = false;
+    private static final VarHandle paraFontHandle;
+    static {
+        try {
+            paraFontHandle = MethodHandles.privateLookupIn(StandardTooltipV2Expandable.class, MethodHandles.lookup()).findVarHandle(
+                StandardTooltipV2Expandable.class,
+                "paraFont",
+                String.class
+            );
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
 
+    private static boolean isShowingEntityPicker = false;
+    public static int BLACKLIST_DIALOG_HOTKEY;
+
+    private static boolean isPaused;
     private static final Object dialogDismissed = new DialogDismissedListener() {
         @Override
         public void dialogDismissed(Object dialog, int yesOrNo) {
             isShowingEntityPicker = false;
+            Global.getSector().setPaused(isPaused);
+            utils.campaignUISetDialogType(Global.getSector().getCampaignUI(), null);
         }
     }.getProxy();
 
@@ -52,11 +74,15 @@ public class AutoPilotGatesAbility extends BaseToggleAbility {
         isShowingEntityPicker = false;
     }
 
-    protected void setShowingEntityPicker(boolean bool) {
+    public static void setShowingEntityPicker(boolean bool) {
         isShowingEntityPicker = bool;
     }
 
     public static void showAddToBlacklistDialog() {
+        CampaignUIAPI campaignUI = Global.getSector().getCampaignUI();
+        if (utils.campaignUIGetDialogType(campaignUI) != null) return;
+        utils.campaignUISetDialogType(campaignUI, UiUtil.DIALOG_TYPE_MENU_ENUM);
+
         List<SectorEntityToken> gates = new ArrayList<>();
 
         for (StarSystemAPI system : Global.getSector().getStarSystems()) {
@@ -69,8 +95,6 @@ public class AutoPilotGatesAbility extends BaseToggleAbility {
                 }
             }
         }
-
-        CampaignUIAPI campaignUI = Global.getSector().getCampaignUI();
 
         UIPanelAPI entityPickerDialog = showCampaignEntityPicker(
             utils.campaignUIGetScreenPanel(campaignUI),
@@ -130,18 +154,23 @@ public class AutoPilotGatesAbility extends BaseToggleAbility {
             listener.getMaps().add(UiUtil.getMapFromCampaignPickerDialog(entityPickerDialog));
         }
 
-        isShowingEntityPicker = true;
+        isPaused = Global.getSector().isPaused();
 
+        Global.getSector().setPaused(true);
+
+        isShowingEntityPicker = true;
     }
 
     public static void showRemoveFromBlacklistDialog() {
+        CampaignUIAPI campaignUI = Global.getSector().getCampaignUI();
+        if (utils.campaignUIGetDialogType(campaignUI) != null) return;
+        utils.campaignUISetDialogType(campaignUI, UiUtil.DIALOG_TYPE_MENU_ENUM);
+
         List<SectorEntityToken> gates = new ArrayList<>();
 
         for (String id : listener.getBlacklist()) 
             gates.add(Global.getSector().getEntityById(id));
 
-        CampaignUIAPI campaignUI = Global.getSector().getCampaignUI();
-            
         UIPanelAPI entityPickerDialog = showCampaignEntityPicker(
             utils.campaignUIGetScreenPanel(campaignUI),
             dialogDismissed,
@@ -200,6 +229,10 @@ public class AutoPilotGatesAbility extends BaseToggleAbility {
             listener.getMaps().add(UiUtil.getMapFromCampaignPickerDialog(entityPickerDialog));
         }
 
+        isPaused = Global.getSector().isPaused();
+
+        Global.getSector().setPaused(true);
+
         isShowingEntityPicker = true;
     }
 
@@ -233,7 +266,7 @@ public class AutoPilotGatesAbility extends BaseToggleAbility {
     public void createTooltip(TooltipMakerAPI tooltip, boolean arg1) {
         Color gray = Misc.getGrayColor();
         String status = this.isActive() ? " (on)" : " (off)";
-        BaseCustomUIPanelPlugin plugin = null;
+        BaseCustomUIPanelPlugin keyCapturePlugin = null;
         
         if (!Global.CODEX_TOOLTIP_MODE) {
             LabelAPI title = tooltip.addTitle(this.spec.getName() + status);
@@ -241,38 +274,40 @@ public class AutoPilotGatesAbility extends BaseToggleAbility {
             title.setHighlightColor(gray);
 
             if (Global.getCurrentState() == GameState.CAMPAIGN) {
-                plugin = new BaseCustomUIPanelPlugin() {
+                keyCapturePlugin = new BaseCustomUIPanelPlugin() {
                     @Override
                     public void processInput(List<InputEventAPI> events) {
                         for (InputEventAPI event : events) {
                             if (event.isConsumed() || isShowingEntityPicker) continue;
 
                             if (event.isKeyDownEvent()) {
-                                if (event.getEventValue() == Keyboard.KEY_RETURN) {
+                                if (event.getEventValue() == BLACKLIST_DIALOG_HOTKEY) {
                                     event.consume();
                                     if (event.isShiftDown()) {
                                         showRemoveFromBlacklistDialog();
                                     } else {
                                         showAddToBlacklistDialog();
                                     }
+                                    break;
                                 }
                             }
                         }
                     }
                 };
-                tooltip.addCustom(Global.getSettings().createCustom(0f, 0f, plugin), 0f);
             }
         } else {
             tooltip.addSpacer(-10.0F);
         }
 
-        float pad = 10.0f;
-
-        tooltip.addPara("Automatically sets the autopilot course target to the nearest gate to the fleet and links to the gate nearest to the ultimate autopilot course target.\n\nIf the non-gate route costs less fuel than the gate route, then the default course arrow will be green. Otherwise, it will be red.", pad);
-        if (plugin != null) {
-            tooltip.addParaWithMarkup("Press {{%s}} to add gates to the blacklist for the autopilot to ignore.", 5f, "[ENTER]");
-            tooltip.addParaWithMarkup("Press {{%s}} to remove gates from the blacklist.", 2f, "[SHIFT + ENTER]");
-        } 
+        tooltip.addPara("Automatically sets the autopilot course target to the nearest gate to the fleet and links to the gate nearest to the ultimate autopilot course target.\n\nIf the non-gate route costs less fuel than the gate route, then the default course arrow will be green. Otherwise, it will be red.", 10f);
+        if (keyCapturePlugin != null) {
+            tooltip.addCustom(Global.getSettings().createCustom(0f, 0f, keyCapturePlugin), 0f);
+            String paraFont = (String) paraFontHandle.get(tooltip);
+            tooltip.setParaFont("graphics/fonts/orbitron12condensed.fnt");
+            tooltip.addParaWithMarkup("Press {{%s}} to add gates to a blacklist for the autopilot to ignore", 5f, Keyboard.getKeyName(BLACKLIST_DIALOG_HOTKEY).toUpperCase()).setColor(gray);
+            tooltip.addParaWithMarkup("Press {{%s}} to remove gates from the blacklist", 2f, "SHIFT + " + Keyboard.getKeyName(BLACKLIST_DIALOG_HOTKEY).toUpperCase()).setColor(gray);
+            tooltip.setParaFont(paraFont);
+        }
     }
 
     @Override

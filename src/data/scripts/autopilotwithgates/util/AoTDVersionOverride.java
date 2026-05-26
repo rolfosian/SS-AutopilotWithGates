@@ -13,6 +13,7 @@ public class AoTDVersionOverride implements Opcodes {
 
     public static final CanUseBifrostsDelegate delegate;
 
+    public static void init() {}
     static {
         ModSpecAPI modSpec = Global.getSettings().getModManager().getModSpec("aotd_vok");
         if (modSpec != null && Integer.parseInt(modSpec.getVersionInfo().getMajor()) < 5) {

@@ -15,7 +15,6 @@ import com.fs.starfarer.api.campaign.JumpPointAPI.JumpDestination;
 import com.fs.starfarer.api.campaign.LocationAPI;
 import com.fs.starfarer.api.campaign.OptionPanelAPI.OptionTooltipCreator;
 import com.fs.starfarer.api.campaign.SectorEntityToken;
-import com.fs.starfarer.api.campaign.StarSystemAPI;
 import com.fs.starfarer.api.campaign.comm.CommMessageAPI.MessageClickAction;
 import com.fs.starfarer.api.campaign.listeners.ListenerUtil;
 import com.fs.starfarer.api.campaign.rules.MemoryAPI;
@@ -23,12 +22,12 @@ import com.fs.starfarer.api.campaign.rules.MemoryAPI;
 import com.fs.starfarer.api.ui.TooltipMakerAPI;
 
 import com.fs.starfarer.api.util.Misc;
-import com.fs.starfarer.api.util.Pair;
 
 import data.scripts.autopilotwithgates.util.GateAutoPilotRuleMemory;
 import data.scripts.autopilotwithgates.util.GateFinder;
 import data.scripts.autopilotwithgates.util.UiUtil;
 
+import static data.scripts.autopilotwithgates.AutopilotWithGatesPlugin.lunalibEnabled;
 import static data.scripts.autopilotwithgates.AutopilotWithGatesPlugin.systemBifrostData;
 import static data.scripts.autopilotwithgates.AutopilotWithGatesPlugin.systemGateData;
 
@@ -42,7 +41,7 @@ public class AutoPilotListenerWithBifrosts extends AutoPilotListener {
     public AutoPilotListenerWithBifrosts(boolean abilityActive) {
         super(abilityActive);
 
-        if (Global.getSettings().getModManager().isModEnabled("lunalib")) {
+        if (lunalibEnabled) {
             this.preferBifrostsInSystemsWithBoth = LunaSettings.getBoolean("autopilot_with_gates", "preferBifrostsInSystemsWithBoth");
 
         } else {
@@ -57,9 +56,15 @@ public class AutoPilotListenerWithBifrosts extends AutoPilotListener {
     }
 
     @Override
+    protected void resetAfterBlacklist(CampaignUIAPI campaignUI) {
+        this.areGatesBifrosts = false;
+        super.resetAfterBlacklist(campaignUI);
+    }
+
+    @Override
     protected void setArrowColor(CampaignFleetAPI playerFleet) {
         if (!this.areGatesBifrosts) {
-            this.gateArrowColor = UiUtil.getFleetArrow(playerFleet).getColor();
+            this.gateArrowColor = lastLegArrowColor;
             super.setArrowColor(playerFleet);
             return;
         }
@@ -70,36 +75,70 @@ public class AutoPilotListenerWithBifrosts extends AutoPilotListener {
 
     @Override
     protected void findNewEntryGate(CampaignUIAPI campaignUI, LocationAPI playerLoc, CampaignFleetAPI playerFleet) {
-        GateData entryNormGate, exitNormGate;
-        Pair<GateData, GateData> bifrosts;
+        GateData entryNormGate = null, exitNormGate, entryBifrost = null, exitBifrost;
+
+        boolean validGates = false;
+        boolean validBifrosts = false;
         
         if (playerLoc.isHyperspace()) {
             exitNormGate = GateFinder.getNearestGate(systemGateData, this.currentUltimateTarget);
-            entryNormGate = GateFinder.getNearestGateToPlayerOutsideLocation(systemGateData, exitNormGate.gate, this.currentUltimateTarget);
-        } else {
-            exitNormGate = GateFinder.getNearestGate(systemGateData, this.currentUltimateTarget);
-            entryNormGate = GateFinder.getNearestGateInLocation(playerLoc, playerFleet.getLocation());
-        }
-        bifrosts = this.findBifrosts(playerLoc, playerFleet, this.currentUltimateTarget);
 
-        boolean validGates = exitNormGate != null && entryNormGate != null;
-        boolean validBifrosts = bifrosts != null;
+            if (exitNormGate != null) {
+                entryNormGate = GateFinder.getNearestGateToPlayerOutsideLocation(systemGateData, exitNormGate.gate, this.currentUltimateTarget);
+                validGates = entryNormGate != null;
+            }
+
+            exitBifrost = GateFinder.getNearestGate(systemBifrostData, this.currentUltimateTarget);
+            if (exitBifrost != null) {
+                entryBifrost = GateFinder.getNearestGateToPlayerOutsideLocation(systemBifrostData, exitBifrost.gate, this.currentUltimateTarget);
+                validBifrosts = entryBifrost != null;
+            }
+
+        } else {
+            exitBifrost = GateFinder.getNearestGate(systemBifrostData, this.currentUltimateTarget);
+
+            if (exitBifrost != null) {
+                entryBifrost = GateFinder.getNearestBifrostInLocation(playerLoc, playerFleet.getLocation());
+                if (entryBifrost == null) entryBifrost = GateFinder.getNearestGateToPlayerOutsideLocation(systemBifrostData, exitBifrost.gate, this.currentUltimateTarget);
+                validBifrosts = entryBifrost != null;
+            }
+
+            exitNormGate = GateFinder.getNearestGate(systemGateData, this.currentUltimateTarget);
+
+            if (exitNormGate != null) {
+                entryNormGate = GateFinder.getNearestGateInLocation(playerLoc, playerFleet.getLocation());
+                if (entryNormGate == null) entryNormGate = GateFinder.getNearestGateToPlayerOutsideLocation(systemGateData, exitNormGate.gate, this.currentUltimateTarget);
+                validGates = entryNormGate != null;
+            }
+        }
 
         boolean useBifrosts;
         if (validGates && validBifrosts) {
-            useBifrosts = shouldUseBifrosts(bifrosts, entryNormGate, exitNormGate, playerFleet, this.currentUltimateTarget);
+            useBifrosts = shouldUseBifrosts(entryBifrost, exitBifrost, entryNormGate, exitNormGate, playerFleet, this.currentUltimateTarget);
         } else if (validBifrosts) {
             useBifrosts = true;
         } else if (validGates) {
             useBifrosts = false;
         } else {
+            boolean followMouse = campaignUI.isPlayerFleetFollowingMouse();
+            boolean isFollowingDirectCommand = campaignUI.isFollowingDirectCommand();
+            SectorEntityToken interactionTarget = playerFleet.getInteractionTarget();
+
+            this.layInCourseFor(this.currentUltimateTarget);
+            this.handleMouseStatus(followMouse, isFollowingDirectCommand, interactionTarget, campaignUI);
+
+            this.areGatesBifrosts = false;
+            this.entryGate = null;
+            this.exitGate = null;
+            this.currentUltimateTarget = null;
+            this.wasJustGotCloserThanGate = true;
             return;
         }
 
         GateData bestEntry, bestExit;
         if (useBifrosts) {
-            bestEntry = bifrosts.one;
-            bestExit = bifrosts.two;
+            bestEntry = entryBifrost;
+            bestExit = exitBifrost;
         } else {
             bestEntry = entryNormGate;
             bestExit = exitNormGate;
@@ -121,31 +160,131 @@ public class AutoPilotListenerWithBifrosts extends AutoPilotListener {
 
     @Override
     protected void findGates(CampaignUIAPI campaignUI, LocationAPI playerLoc, CampaignFleetAPI playerFleet, SectorEntityToken ultimateTarget) {
-        boolean wasJustActivated = this.wasJustActivated;
-        boolean wasJustGotCloserThanGate = this.wasJustGotCloserThanGate;
+        this.currentUltimateTarget = ultimateTarget;
+        GateData entryNormGate = null;
+        GateData exitNormGate = null;
+        GateData entryBifrost = null;
+        GateData exitBifrost = null;
 
-        super.findGates(campaignUI, playerLoc, playerFleet, ultimateTarget);
-        Pair<GateData, GateData> bifrosts = findBifrosts(playerLoc, playerFleet, ultimateTarget);
+        boolean validGates = false;
+        boolean validBifrosts = false;
 
-        if (bifrosts != null) {
-            if (this.entryGate == null || shouldUseBifrosts(bifrosts, this.entryGate, this.exitGate, playerFleet, ultimateTarget)) {
-                this.areGatesBifrosts = true;
-                this.entryGate = bifrosts.one;
-                this.exitGate = bifrosts.two;
+        if (!playerLoc.isHyperspace()) {
+            entryNormGate = GateFinder.getNearestGateInLocation(playerLoc, playerFleet.getLocation());
 
-                boolean followMouse = campaignUI.isPlayerFleetFollowingMouse();
-                boolean isFollowingDirectCommand = campaignUI.isFollowingDirectCommand();
-                SectorEntityToken interactionTarget = playerFleet.getInteractionTarget();
+            if (entryNormGate != null) {
+                exitNormGate = GateFinder.getNearestGate(systemGateData, ultimateTarget);
+                validGates = exitNormGate != null;
+            }
 
-                this.layInCourseFor(this.entryGate.gate);
+            entryBifrost = GateFinder.getNearestBifrostInLocation(playerLoc, playerFleet.getLocation());
 
-                if (wasJustActivated || wasJustGotCloserThanGate) this.handleMouseStatus(followMouse, isFollowingDirectCommand, interactionTarget, campaignUI);
+            if (entryBifrost != null) {
+                exitBifrost = GateFinder.getNearestGate(systemBifrostData, ultimateTarget);
+                validBifrosts = exitBifrost != null;
+            }
 
-                this.wasJustActivated = false;
-                this.wasJustGotCloserThanGate = false;
+            if (!validGates && !validBifrosts) {
+                if (entryBifrost != null && entryNormGate != null) {
+                    return;
+                }
+            } else {
+                applyBestRoute(
+                    campaignUI,
+                    playerFleet,
+                    ultimateTarget,
+                    entryNormGate,
+                    exitNormGate,
+                    entryBifrost,
+                    exitBifrost,
+                    validGates,
+                    validBifrosts
+                );
                 return;
             }
         }
+
+        exitBifrost = GateFinder.getNearestGate(systemBifrostData, ultimateTarget);
+        if (exitBifrost != null) {
+            if (entryBifrost == null) entryBifrost = GateFinder.getNearestGateToPlayerOutsideLocation(systemBifrostData, exitBifrost.gate, ultimateTarget);
+            validBifrosts = entryBifrost != null;
+        }
+
+        exitNormGate = GateFinder.getNearestGate(systemGateData, ultimateTarget);
+
+        if (exitNormGate != null) {
+            if (entryNormGate == null) entryNormGate = GateFinder.getNearestGateToPlayerOutsideLocation(systemGateData, exitNormGate.gate, ultimateTarget);
+            validGates = entryNormGate != null;
+        }
+        
+
+        if (!validGates && !validBifrosts) {
+            this.wasJustActivated = false;
+            this.entryGate = null;
+            this.exitGate = null;
+            return;
+        }
+
+        applyBestRoute(
+            campaignUI,
+            playerFleet,
+            ultimateTarget,
+            entryNormGate,
+            exitNormGate,
+            entryBifrost,
+            exitBifrost,
+            validGates,
+            validBifrosts
+        );
+    }
+
+    private void applyBestRoute(
+            CampaignUIAPI campaignUI,
+            CampaignFleetAPI playerFleet,
+            SectorEntityToken ultimateTarget,
+            GateData entryNormGate,
+            GateData exitNormGate,
+            GateData entryBifrost,
+            GateData exitBifrost,
+            boolean validGates,
+            boolean validBifrosts
+    ) {
+        boolean useBifrosts;
+
+        if (validGates && validBifrosts) {
+            useBifrosts = shouldUseBifrosts(
+                    entryBifrost,
+                    exitBifrost,
+                    entryNormGate,
+                    exitNormGate,
+                    playerFleet,
+                    ultimateTarget
+            );
+        } else {
+            useBifrosts = validBifrosts;
+        }
+
+        this.areGatesBifrosts = useBifrosts;
+
+        if (useBifrosts) {
+            this.entryGate = entryBifrost;
+            this.exitGate = exitBifrost;
+        } else {
+            this.entryGate = entryNormGate;
+            this.exitGate = exitNormGate;
+        }
+
+        boolean followMouse = campaignUI.isPlayerFleetFollowingMouse();
+        boolean isFollowingDirectCommand = campaignUI.isFollowingDirectCommand();
+        SectorEntityToken interactionTarget = playerFleet.getInteractionTarget();
+
+        this.layInCourseFor(this.entryGate.gate);
+
+        if (this.wasJustActivated || this.wasJustGotCloserThanGate)
+            this.handleMouseStatus(followMouse, isFollowingDirectCommand, interactionTarget, campaignUI);
+        
+        this.wasJustActivated = false;
+        this.wasJustGotCloserThanGate = false;
     }
 
     @Override
@@ -293,32 +432,9 @@ public class AutoPilotListenerWithBifrosts extends AutoPilotListener {
         this.areGatesBifrosts = false;
     }
 
-    private Pair<GateData, GateData> findBifrosts(
-        LocationAPI playerLoc,
-        SectorEntityToken playerFleet,
-        SectorEntityToken ultimateTarget
-    ) {
-        GateData entry, exit;
-
-        if (playerLoc instanceof StarSystemAPI) {
-            entry = GateFinder.getNearestBifrostInLocation(playerLoc, playerFleet.getLocation());
-
-            if (entry != null) {
-                exit = GateFinder.getNearestGate(systemBifrostData, ultimateTarget);
-
-                if (exit != null) return new Pair<>(entry, exit);
-                else entry = null;
-            }
-        }
-
-        exit = GateFinder.getNearestGate(systemBifrostData, ultimateTarget);
-        entry = exit != null ? GateFinder.getNearestGateToPlayerOutsideLocation(systemBifrostData, exit.gate, this.currentUltimateTarget) : null;
-
-        return entry != null && exit != null ? new Pair<>(entry, exit) : null;
-    }
-
     private boolean shouldUseBifrosts(
-        Pair<GateData, GateData> bifrosts,
+        GateData entryBifrost,
+        GateData exitBifrost,
         GateData normEntryGate,
         GateData normExitGate,
         SectorEntityToken playerFleet,
@@ -327,42 +443,43 @@ public class AutoPilotListenerWithBifrosts extends AutoPilotListener {
         LocationAPI playerContainingLoc = playerFleet.getContainingLocation();
         LocationAPI ultimateTargetContainingLoc = ultimateTarget.getContainingLocation();
 
-        if (playerContainingLoc == bifrosts.one.gate.getContainingLocation() && playerContainingLoc == normEntryGate.gate.getContainingLocation()) {
-            if (ultimateTargetContainingLoc == bifrosts.two.gate.getContainingLocation() && ultimateTargetContainingLoc == normExitGate.gate.getContainingLocation()) {
+        if (playerContainingLoc == entryBifrost.gate.getContainingLocation() && playerContainingLoc == normEntryGate.gate.getContainingLocation()) {
+            if (ultimateTargetContainingLoc == exitBifrost.gate.getContainingLocation() && ultimateTargetContainingLoc == normExitGate.gate.getContainingLocation()) {
                 if (this.preferBifrostsInSystemsWithBoth) return true;
                 // calc dist in systems
                 Vector2f playerLoc = playerFleet.getLocation();
-                float distBifrost = distanceBetween(bifrosts.one.gate.getLocation(), playerLoc) + distanceBetween(bifrosts.two.gate.getLocation(), ultimateTarget.getLocation());
-                float distNorm = distanceBetween(normEntryGate.gate.getLocation(), playerLoc) + distanceBetween(normExitGate.gate.getLocation(), ultimateTarget.getLocation());
+                float distBifrost = GateFinder.getDistSq(entryBifrost.gate.getLocation(), playerLoc) + GateFinder.getDistSq(exitBifrost.gate.getLocation(), ultimateTarget.getLocation());
+                float distNorm = GateFinder.getDistSq(normEntryGate.gate.getLocation(), playerLoc) + GateFinder.getDistSq(normExitGate.gate.getLocation(), ultimateTarget.getLocation());
 
                 return distBifrost <= distNorm;
             }
         }
 
-        if (bifrosts.one.gate.getContainingLocation() == normEntryGate.gate.getContainingLocation()) {
-            if (ultimateTargetContainingLoc == bifrosts.two.gate.getContainingLocation() && ultimateTargetContainingLoc == normExitGate.gate.getContainingLocation()) {
+        if (entryBifrost.gate.getContainingLocation() == normEntryGate.gate.getContainingLocation()) {
+            if (ultimateTargetContainingLoc == exitBifrost.gate.getContainingLocation() && ultimateTargetContainingLoc == normExitGate.gate.getContainingLocation()) {
                 if (this.preferBifrostsInSystemsWithBoth) return true;
                 
                 Vector2f ultimateTargetLoc = ultimateTarget.getLocation();
 
-                float distBifrost = bifrosts.one.closestEntryDistSq + distanceBetween(bifrosts.two.gate.getLocation(), ultimateTargetLoc);
-                float distNorm = normEntryGate.closestEntryDistSq + distanceBetween(normExitGate.gate.getLocation(), ultimateTargetLoc);
+                float distBifrost = entryBifrost.closestEntryDistSq + GateFinder.getDistSq(exitBifrost.gate.getLocation(), ultimateTargetLoc);
+                float distNorm = normEntryGate.closestEntryDistSq + GateFinder.getDistSq(normExitGate.gate.getLocation(), ultimateTargetLoc);
 
                 return distBifrost <= distNorm;
             }
         }
 
-        return isBifrostsLessDistanceLY(bifrosts, normEntryGate, normExitGate, playerFleet, ultimateTarget);
+        return isBifrostsLessDistanceLY(entryBifrost, exitBifrost, normEntryGate, normExitGate, playerFleet, ultimateTarget);
     }
 
     private boolean isBifrostsLessDistanceLY(
-        Pair<GateData, GateData> bifrosts,
+        GateData entryBifrost,
+        GateData exitBifrost,
         GateData normEntryGate,
         GateData normExitGate,
         SectorEntityToken playerFleet,
         SectorEntityToken ultimateTarget
     ) {
-        return Misc.getDistanceLY(playerFleet, bifrosts.one.gate) + Misc.getDistanceLY(bifrosts.two.gate, ultimateTarget)
+        return Misc.getDistanceLY(playerFleet, entryBifrost.gate) + Misc.getDistanceLY(exitBifrost.gate, ultimateTarget)
             < Misc.getDistanceLY(playerFleet, normEntryGate.gate) + Misc.getDistanceLY(normExitGate.gate, ultimateTarget);
     }
 }

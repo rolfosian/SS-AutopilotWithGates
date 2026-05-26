@@ -2,3 +2,4 @@ fieldID,fieldName,fieldType,defaultValue,secondaryValue,fieldDescription,minValu
 autoJump,Autojump,Boolean,false,,"If true, autopilot jumps automatically when reaching gates",,,
 abilityScroll,Ability Bar Scrolling,Boolean,false,,"If true, enables mouse wheel scrolling of ability bars",,,
 preferBifrostsInSystemsWithBoth,Prefer Bifrosts,Boolean,false,,"If true, gate autopilot prefers AotD Bifrost gates if both connections are in the same systems and bifrosts are off cooldown (Only applicable if the AoTD VoK mod is enabled)",,,
+blacklistDialogHotkey,Hotkey To Open Gate Blacklist Dialog,Keycode,48,,Hotkey to open the gate blacklist dialog from the Autopilot With Gates ability tooltip,,,

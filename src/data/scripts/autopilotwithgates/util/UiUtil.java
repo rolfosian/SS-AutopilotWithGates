@@ -5,9 +5,6 @@ import java.util.List;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
-
-import static data.scripts.autopilotwithgates.AutopilotWithGatesPlugin.listener;
-
 import java.lang.invoke.CallSite;
 import java.lang.invoke.LambdaMetafactory;
 import java.lang.invoke.MethodHandle;
@@ -38,8 +35,6 @@ import com.fs.starfarer.campaign.fleet.CampaignFleet;
 import com.fs.starfarer.ui.newui.CampaignEntityPickerDialog;
 
 import data.scripts.autopilotwithgates.org.objectweb.asm.*;
-import data.scripts.autopilotwithgates.util.UiUtil.ActionListener;
-import data.scripts.autopilotwithgates.util.UiUtil.UtilInterface;
 
 public class UiUtil implements Opcodes {
     private static final Logger logger = Logger.getLogger(UiUtil.class);
@@ -58,6 +53,8 @@ public class UiUtil implements Opcodes {
         public UIPanelAPI coreGetCurrentTab(Object core);
 
         public UIPanelAPI campaignUIGetScreenPanel(Object campaignUI);
+        public Object campaignUIGetDialogType(Object campaignUI);
+        public void campaignUISetDialogType(Object campaignUI, Object dialogTypeEnum);
         public UIPanelAPI confirmDialogGetInnerPanel(Object confirmDialog);
 
         public EventsPanel getEventsPanel(Object intelTab);
@@ -146,8 +143,13 @@ public class UiUtil implements Opcodes {
         String eventsPanelDesc = Type.getDescriptor(EventsPanel.class);
         String baseLocationDesc = Type.getDescriptor(BaseLocation.class);
         String tooltipDesc = Type.getDescriptor(toolTipClass);
+        String messageDisplayDesc = Type.getDescriptor(messageDisplayClass);
 
         String campaignStateInternalName = Type.getInternalName(CampaignState.class);
+
+        Class<?> campaignStateDialogTypeEnumClass = Refl.getMethodParamTypes(Refl.getMethod("setDialogType", CampaignState.class))[0];
+        String campaignStateDialogTypeInternalName = Type.getInternalName(campaignStateDialogTypeEnumClass);
+        String campaignStateDialogTypeDesc = Type.getDescriptor(campaignStateDialogTypeEnumClass);
 
         ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS);
         // public class UtilInterface extends Object implements this crap
@@ -655,6 +657,68 @@ public class UiUtil implements Opcodes {
             mv.visitEnd();
         }
 
+        // public Object campaignUIGetDialogType(Object campaignUI) {
+        //     return ((CampaignState)campaignUI).getDialogType();
+        // }
+        {
+            MethodVisitor mv = cw.visitMethod(
+                ACC_PUBLIC,
+                "campaignUIGetDialogType",
+                "(Ljava/lang/Object;)Ljava/lang/Object;",
+                null,
+                null
+            );
+            mv.visitCode();
+
+            mv.visitVarInsn(ALOAD, 1);
+            mv.visitTypeInsn(CHECKCAST, campaignStateInternalName);
+
+            mv.visitMethodInsn(
+                INVOKEVIRTUAL,
+                campaignStateInternalName,
+                "getDialogType",
+                "()" + campaignStateDialogTypeDesc,
+                false
+            );
+
+            mv.visitInsn(ARETURN);
+
+            mv.visitMaxs(0, 0);
+            mv.visitEnd();
+        }
+
+        // public void campaignUISetDialogType(Object campaignUI, Object dialogType) {
+        //    ((CampaignState)campaignUI).setDialogType(dialogType);
+        // }
+        {
+            MethodVisitor mv = cw.visitMethod(
+                ACC_PUBLIC,
+                "campaignUISetDialogType",
+                "(Ljava/lang/Object;Ljava/lang/Object;)V",
+                null,
+                null
+            );
+            mv.visitCode();
+
+            mv.visitVarInsn(ALOAD, 1);
+            mv.visitTypeInsn(CHECKCAST, campaignStateInternalName);
+            mv.visitVarInsn(ALOAD, 2);
+            mv.visitTypeInsn(CHECKCAST, campaignStateDialogTypeInternalName);
+
+            mv.visitMethodInsn(
+                INVOKEVIRTUAL,
+                campaignStateInternalName,
+                "setDialogType",
+                "(" + campaignStateDialogTypeDesc + ")V",
+                false
+            );
+
+            mv.visitInsn(RETURN);
+
+            mv.visitMaxs(0, 0);
+            mv.visitEnd();
+        }
+
         // public Object getMessageDisplay(Object campaignUI) {
         //     return ((CampaignState)campaignUI).getMessageDisplay();
         // }
@@ -675,7 +739,7 @@ public class UiUtil implements Opcodes {
                 INVOKEVIRTUAL,
                 campaignStateInternalName,
                 "getMessageDisplay",
-                "()" + Type.getDescriptor(messageDisplayClass),
+                "()" + messageDisplayDesc,
                 false
             );
 
@@ -1084,7 +1148,8 @@ public class UiUtil implements Opcodes {
             uiComponentClass,
             messageDisplayClass,
             intelTabPlanetsPanelClass,
-            mapTabClass
+            mapTabClass,
+            campaignStateDialogTypeEnumClass
         };
     }
 
@@ -1101,6 +1166,9 @@ public class UiUtil implements Opcodes {
     private static final VarHandle campaignEntityPickerDialogMapHandle;
     private static final VarHandle campaignFleetArrowHandle;
 
+    public static final Object DIALOG_TYPE_MENU_ENUM;
+
+    // public static final VarHandle isOnAbilityBarHandle;
     public static final VarHandle abilityPanelPrevButtonHandle;
     public static final VarHandle abilityPanelNextButtonHandle;
 
@@ -1115,7 +1183,20 @@ public class UiUtil implements Opcodes {
 
             Class<?> abilityPanelClass = Refl.getFieldType(Refl.getFieldByName(abilityPanelFieldName, coreClass));
             Class<?> actionListenerInterface = abilityPanelClass.getInterfaces()[0];
+            // Class<?> abilityTooltipClass = getAbilityTooltipClass(abilityPanelClass);
 
+            // VarHandle handle = null;
+            // for (Object field : abilityTooltipClass.getDeclaredFields()) {
+            //     if (Refl.getFieldType(field) == boolean.class) {
+            //         handle = MethodHandles.privateLookupIn(abilityTooltipClass, MethodHandles.lookup()).findVarHandle(
+            //             abilityTooltipClass,
+            //             Refl.getFieldName(field),
+            //             boolean.class
+            //         );
+            //     }
+            // }
+            // isOnAbilityBarHandle = handle;
+            
             Class<?>[] result = implementUtilInterface(coreClass, abilityPanelClass, actionListenerInterface);
             utils = (UtilInterface) Refl.instantiateClass(result[0].getConstructors()[0]);
 
@@ -1137,6 +1218,15 @@ public class UiUtil implements Opcodes {
                 Refl.getFieldName(Refl.getFieldByType(mapTabClass, intelTabPlanetsPanelClass)),
                 mapTabClass
             );
+
+            Object targetEnum = null;
+            for (Object e : result[7].getEnumConstants()) {
+                if (String.valueOf(e).equals("MENU")) {
+                    targetEnum = e;
+                    break;
+                }
+            }
+            DIALOG_TYPE_MENU_ENUM = targetEnum;
 
             campaignFleetArrowHandle = MethodHandles.privateLookupIn(CampaignFleet.class, lookup).findVarHandle(
                 CampaignFleet.class,

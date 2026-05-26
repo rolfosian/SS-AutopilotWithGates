@@ -4,6 +4,7 @@ import java.awt.Color;
 import java.util.*;
 
 import org.apache.log4j.Logger;
+import org.lwjgl.input.Keyboard;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.util.vector.Vector2f;
 
@@ -13,7 +14,7 @@ import com.fs.starfarer.campaign.BaseLocation;
 import com.fs.starfarer.campaign.CampaignEngine;
 import com.fs.starfarer.campaign.fleet.CampaignFleet;
 import com.fs.starfarer.combat.CombatViewport;
-
+import com.fs.starfarer.ui.newui.CampaignEntityPickerDialog;
 import com.fs.starfarer.api.EveryFrameScript;
 import com.fs.starfarer.api.Global;
 
@@ -53,8 +54,9 @@ import data.scripts.autopilotwithgates.util.GateFinder;
 import data.scripts.autopilotwithgates.util.TreeTraverser;
 import data.scripts.autopilotwithgates.util.TreeTraverser.TreeNode;
 import data.scripts.autopilotwithgates.util.UiUtil;
-import static data.scripts.autopilotwithgates.util.UiUtil.utils;
 
+import static data.scripts.autopilotwithgates.util.UiUtil.utils;
+import static data.scripts.autopilotwithgates.AutopilotWithGatesPlugin.lunalibEnabled;
 import static data.scripts.autopilotwithgates.AutopilotWithGatesPlugin.systemGateData;
 
 import lunalib.lunaSettings.LunaSettings;
@@ -96,8 +98,10 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
     protected boolean noExitJumpPoints = true;
     protected boolean renderingArrow = false;
     protected BaseLocation arrowRenderingLoc;
+
     protected Color arrowColor = DARK_RED;
     protected Color gateArrowColor = Misc.getBasePlayerColor();
+    protected Color lastLegArrowColor = Misc.getBasePlayerColor();
 
     protected final Maps maps = new Maps();
 
@@ -108,11 +112,13 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
 
         this.blacklist = (Set<String>) Global.getSector().getPersistentData().computeIfAbsent("$apwgBlacklist", key -> new HashSet<>());
         
-        if (Global.getSettings().getModManager().isModEnabled("lunalib")) {
+        if (lunalibEnabled) {
             this.autoJump = LunaSettings.getBoolean("autopilot_with_gates", "autoJump");
+            AutoPilotGatesAbility.BLACKLIST_DIALOG_HOTKEY = LunaSettings.getInt("autopilot_with_gates", "blacklistDialogHotkey");
 
         } else {
             this.autoJump = Global.getSettings().getBoolean("gateAutopilot_autoJump");
+            AutoPilotGatesAbility.BLACKLIST_DIALOG_HOTKEY = Global.getSettings().getInt("gateAutopilot_blacklistDialogHotkey");
         }
 
         if (Global.getSector().getPlayerFleet().getContainingLocation() instanceof StarSystemAPI system && system.getEntities(JumpPointAPI.class).size() == 0) this.noExitJumpPoints = true;
@@ -191,10 +197,14 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                     for (UIComponentAPI child : node.getChildren()) {
                         if (child.getClass() == UiUtil.mapClass) {
                             mapsPresent = true;
-
-                            if (!this.maps.containsKey(child)) {
+                            if (!this.maps.containsKey(child))
                                 this.maps.add((UIPanelAPI) child);
-                            }
+                            
+                        } else if (child.getClass() == CampaignEntityPickerDialog.class) {
+                            mapsPresent = true;
+                            UIPanelAPI map = UiUtil.getMapFromCampaignPickerDialog(child);
+                            if (!this.maps.containsKey(map))
+                                this.maps.add(map);
                         }
                     }
                 }
@@ -223,8 +233,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                 }
             }
 
-            if (AutoPilotGatesAbility.isShowingEntityPicker()) mapsPresent = true;
-            if (!mapsPresent && !this.maps.isEmpty()) this.maps.clear();
+            if (!AutoPilotGatesAbility.isShowingEntityPicker() && !mapsPresent && !this.maps.isEmpty()) this.maps.clear();
             this.findNewEntryGate(campaignUI, playerLoc, playerFleet);
             return;
         }
@@ -261,7 +270,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
             boolean isFollowingDirectCommand = campaignUI.isFollowingDirectCommand();
             SectorEntityToken interactionTarget = playerFleet.getInteractionTarget();
 
-            this.layInCourseFor(interactionTarget);
+            this.layInCourseFor(this.currentUltimateTarget);
             this.handleMouseStatus(followMouse, isFollowingDirectCommand, interactionTarget, campaignUI);
 
             this.entryGate = null;
@@ -274,7 +283,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
     protected void findGates(CampaignUIAPI campaignUI, LocationAPI playerLoc, CampaignFleetAPI playerFleet, SectorEntityToken ultimateTarget) {
         this.currentUltimateTarget = ultimateTarget;
 
-        if (playerLoc instanceof StarSystemAPI) {
+        if (!playerLoc.isHyperspace()) {
             this.entryGate = GateFinder.getNearestGateInLocation(playerLoc, playerFleet.getLocation());
 
             if (this.entryGate != null) {
@@ -868,8 +877,6 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                 playerLocation = self.entryGate.gate.getLocationInHyperspace();
                 targetLocation = self.exitGate.gate.getLocationInHyperspace();
 
-                Color gateArrowColor = self.gateArrowColor;
-
                 if (distanceBetween(playerLocation, targetLocation) >= 1000f) {
                     arrowSize = 10.0F;
                     arrowSpacing = 3.0F;
@@ -896,7 +903,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                         this.gateCourseCircleOffset,
                         arrowSize,
                         arrowSpacing,
-                        gateArrowColor,
+                        self.gateArrowColor,
                         alphaMult,
                         gateCircle
                     );
@@ -943,7 +950,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                         this.gateCourseLastLegOffset,
                         arrowSize,
                         arrowSpacing,
-                        gateArrowColor,
+                        self.lastLegArrowColor,
                         alphaMult,
                         arrow
                     );

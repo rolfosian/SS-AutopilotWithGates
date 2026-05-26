@@ -44,14 +44,16 @@ public class AutopilotWithGatesPlugin extends BaseModPlugin {
     private Thread systemGateIteratorThread;
     private static volatile boolean iteratorRunning = true;
     public static final Object systemGateIteratorLock = new Object();
-    public static Map<LocationAPI, SystemGateData> systemsToGates = new HashMap<>();
-    public static Map<LocationAPI, SystemGateData> systemsToBifrosts = new HashMap<>();
-    public static List<SystemGateData> systemGateData = new ArrayList<>();
-    public static List<SystemGateData> systemBifrostData = new ArrayList<>();
+    
+    public static volatile Map<LocationAPI, SystemGateData> systemsToGates = new HashMap<>();
+    public static volatile Map<LocationAPI, SystemGateData> systemsToBifrosts = new HashMap<>();
+    public static volatile List<SystemGateData> systemGateData = new ArrayList<>();
+    public static volatile List<SystemGateData> systemBifrostData = new ArrayList<>();
 
     public static AbilityScroller abilityScroller;
 
     public static boolean aotdEnabled;
+    public static boolean lunalibEnabled;
 
     public static AutopilotWithGatesPlugin getInstance() {
         return instance;
@@ -61,12 +63,9 @@ public class AutopilotWithGatesPlugin extends BaseModPlugin {
     public void onApplicationLoad() {
         Refl.init();
         UiUtil.init();
-        if (Global.getSettings().getModManager().isModEnabled("lunalib")) {
-            GateFinder.LY_DIST_TOLERANCE = Global.getSettings().getFloat("gateAutopilot_LY_DIST_TOLERANCE");
-        } else {
-            GateFinder.LY_DIST_TOLERANCE = Global.getSettings().getFloat("gateAutopilot_LY_DIST_TOLERANCE");
-        }
-        aotdEnabled = Global.getSettings().getModManager().isModEnabled("aotd_vok");
+        if (aotdEnabled = Global.getSettings().getModManager().isModEnabled("aotd_vok")) 
+            AoTDVersionOverride.init();
+        GateFinder.LY_DIST_TOLERANCE = Global.getSettings().getFloat("gateAutopilot_LY_DIST_TOLERANCE");
         instance = this;
     }
 
@@ -106,13 +105,10 @@ public class AutopilotWithGatesPlugin extends BaseModPlugin {
                 playerFleet.addAbility("AutoPilotWithGates");
 
                 listener.setAbility((AutoPilotGatesAbility) Global.getSector().getPlayerFleet().getAbility("AutoPilotWithGates"));
-                listener.getAbility().setShowingEntityPicker(false);
-
                 sector.getCampaignUI().addMessage(UiUtil.unlockedMessagePlugin, MessageClickAction.NOTHING);
 
             } else if (listener.getAbility() == null) {
                 AutoPilotGatesAbility ability = (AutoPilotGatesAbility) Global.getSector().getPlayerFleet().getAbility("AutoPilotWithGates");
-                ability.setShowingEntityPicker(false);
                 listener.setAbility(ability);
             }
 
@@ -135,7 +131,6 @@ public class AutopilotWithGatesPlugin extends BaseModPlugin {
                         Global.getSector().getPlayerFleet().addAbility("AutoPilotWithGates");
 
                         listener.setAbility((AutoPilotGatesAbility) Global.getSector().getPlayerFleet().getAbility("AutoPilotWithGates"));
-                        listener.getAbility().setShowingEntityPicker(false);
 
                         registerGateIterator();
 
@@ -157,6 +152,8 @@ public class AutopilotWithGatesPlugin extends BaseModPlugin {
                 }
             });
         }
+
+        AutoPilotGatesAbility.setShowingEntityPicker(false);
 
         boolean abilityScroll;
         if (Global.getSettings().getModManager().isModEnabled("lunalib")) {
@@ -273,6 +270,7 @@ public class AutopilotWithGatesPlugin extends BaseModPlugin {
             while (systemGateIteratorThread.isAlive()) {
                 systemGateIteratorThread.interrupt();
             }
+            // dont need the lock here as this method should only be called on the main thread
             systemsToGates = new HashMap<>();
             systemGateData = new ArrayList<>();
 
@@ -378,10 +376,8 @@ public class AutopilotWithGatesPlugin extends BaseModPlugin {
         }
 
         synchronized(systemGateIteratorLock) {
-            systemsToGates.clear();
-            systemsToGates.putAll(newSystemsToGates);
-            systemGateData.clear();
-            systemGateData.addAll(newSystemGateData);
+            systemsToGates = newSystemsToGates;
+            systemGateData = newSystemGateData;
         }
     }
 
@@ -427,15 +423,11 @@ public class AutopilotWithGatesPlugin extends BaseModPlugin {
         }
 
         synchronized(systemGateIteratorLock) {
-            systemsToBifrosts.clear();
-            systemsToBifrosts.putAll(newSystemsToBifrosts);
-            systemBifrostData.clear();
-            systemBifrostData.addAll(newSystemBifrostData);
+            systemsToBifrosts = newSystemsToBifrosts;
+            systemBifrostData = newSystemBifrostData;
 
-            systemsToGates.clear();
-            systemsToGates.putAll(newSystemsToGates);
-            systemGateData.clear();
-            systemGateData.addAll(newSystemGateData);
+            systemsToGates = newSystemsToGates;
+            systemGateData = newSystemGateData;
         }
     }
 
