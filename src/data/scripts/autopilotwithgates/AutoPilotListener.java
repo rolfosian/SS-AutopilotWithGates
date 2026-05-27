@@ -4,7 +4,6 @@ import java.awt.Color;
 import java.util.*;
 
 import org.apache.log4j.Logger;
-import org.lwjgl.input.Keyboard;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.util.vector.Vector2f;
 
@@ -55,11 +54,9 @@ import data.scripts.autopilotwithgates.util.TreeTraverser;
 import data.scripts.autopilotwithgates.util.TreeTraverser.TreeNode;
 import data.scripts.autopilotwithgates.util.UiUtil;
 
+import static data.scripts.autopilotwithgates.AutoPilotWithGatesSettings.*;
 import static data.scripts.autopilotwithgates.util.UiUtil.utils;
-import static data.scripts.autopilotwithgates.AutopilotWithGatesPlugin.lunalibEnabled;
 import static data.scripts.autopilotwithgates.AutopilotWithGatesPlugin.systemGateData;
-
-import lunalib.lunaSettings.LunaSettings;
 
 public class AutoPilotListener extends BaseCampaignEventListener implements EveryFrameScript, LayeredRenderable<CampaignEngineLayers, CombatViewport> {
     private static final Logger logger = Logger.getLogger(AutoPilotListener.class);
@@ -73,13 +70,10 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
     }
 
     protected static final EnumSet<CampaignEngineLayers> layers = EnumSet.of(CampaignEngineLayers.FLEETS);
-    protected static final Color DARK_RED = new Color(139, 0, 0);
-    protected static final Color DARK_GREEN = new Color(0, 139, 0);
     
     protected static final SpriteAPI arrow = Global.getSettings().getSprite("graphics/warroom/ship_arrow.png");
     protected static final SpriteAPI gateCircle = Global.getSettings().getSprite("graphics/icons/gate0.png");
 
-    protected final boolean autoJump;
     protected final AutoPilotListener self = this;
     protected AutoPilotGatesAbility ability;
 
@@ -111,15 +105,6 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
         this.abilityActive = abilityActive;
 
         this.blacklist = (Set<String>) Global.getSector().getPersistentData().computeIfAbsent("$apwgBlacklist", key -> new HashSet<>());
-        
-        if (lunalibEnabled) {
-            this.autoJump = LunaSettings.getBoolean("autopilot_with_gates", "autoJump");
-            AutoPilotGatesAbility.BLACKLIST_DIALOG_HOTKEY = LunaSettings.getInt("autopilot_with_gates", "blacklistDialogHotkey");
-
-        } else {
-            this.autoJump = Global.getSettings().getBoolean("gateAutopilot_autoJump");
-            AutoPilotGatesAbility.BLACKLIST_DIALOG_HOTKEY = Global.getSettings().getInt("gateAutopilot_blacklistDialogHotkey");
-        }
 
         if (Global.getSector().getPlayerFleet().getContainingLocation() instanceof StarSystemAPI system && system.getEntities(JumpPointAPI.class).size() == 0) this.noExitJumpPoints = true;
         else this.noExitJumpPoints = false;
@@ -460,7 +445,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                     
                 });
 
-                if (this.autoJump) {
+                if (AUTOJUMP) {
                     jump.run();
                     return;
                 }

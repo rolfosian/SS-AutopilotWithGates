@@ -22,6 +22,8 @@ import com.fs.starfarer.api.campaign.comm.CommMessageAPI.MessageClickAction;
 import com.fs.starfarer.api.campaign.rules.MemoryAPI;
 import com.fs.starfarer.api.impl.campaign.GateEntityPlugin;
 import com.fs.starfarer.api.impl.campaign.ids.Tags;
+import com.fs.starfarer.api.impl.codex.CodexDataV2;
+import com.fs.starfarer.api.impl.codex.CodexEntryPlugin;
 import com.fs.starfarer.api.ui.UIPanelAPI;
 
 import com.fs.starfarer.campaign.BaseLocation;
@@ -33,9 +35,10 @@ import data.scripts.autopilotwithgates.util.GateFinder;
 import data.scripts.autopilotwithgates.util.Refl;
 import data.scripts.autopilotwithgates.util.UiUtil;
 
-// import data.kaysaar.aotd.vok.campaign.econ.globalproduction.models.GPManager;
+import static data.scripts.autopilotwithgates.AutoPilotWithGatesSettings.*;
+import static data.scripts.autopilotwithgates.AutoPilotListener.print;
 
-import lunalib.lunaSettings.LunaSettings;
+// import data.kaysaar.aotd.vok.campaign.econ.globalproduction.models.GPManager;
 
 public class AutopilotWithGatesPlugin extends BaseModPlugin {
     public static AutoPilotListener listener;
@@ -53,7 +56,6 @@ public class AutopilotWithGatesPlugin extends BaseModPlugin {
     public static AbilityScroller abilityScroller;
 
     public static boolean aotdEnabled;
-    public static boolean lunalibEnabled;
 
     public static AutopilotWithGatesPlugin getInstance() {
         return instance;
@@ -63,8 +65,10 @@ public class AutopilotWithGatesPlugin extends BaseModPlugin {
     public void onApplicationLoad() {
         Refl.init();
         UiUtil.init();
-        if (aotdEnabled = Global.getSettings().getModManager().isModEnabled("aotd_vok")) 
+        AutoPilotWithGatesSettings.init();
+        if (aotdEnabled = Global.getSettings().getModManager().isModEnabled("aotd_vok"))
             AoTDVersionOverride.init();
+
         GateFinder.LY_DIST_TOLERANCE = Global.getSettings().getFloat("gateAutopilot_LY_DIST_TOLERANCE");
         instance = this;
     }
@@ -155,19 +159,12 @@ public class AutopilotWithGatesPlugin extends BaseModPlugin {
 
         AutoPilotGatesAbility.setShowingEntityPicker(false);
 
-        boolean abilityScroll;
-        if (Global.getSettings().getModManager().isModEnabled("lunalib")) {
-            abilityScroll = LunaSettings.getBoolean("autopilot_with_gates", "abilityScroll");
-        } else {
-            abilityScroll = Global.getSettings().getBoolean("gateAutopilot_abilityScroll");
-        }
-
         if (abilityScroller != null) {
             abilityScroller.remove();
             abilityScroller = null;
         }
 
-        if (abilityScroll) {
+        if (ABILITY_SCROLL) {
             Global.getSector().addTransientScript(new EveryFrameScript() {
                 private boolean isDone = false;
                 private int f = 0;
@@ -262,6 +259,20 @@ public class AutopilotWithGatesPlugin extends BaseModPlugin {
         if (abilityScroller != null)  {
             CampaignEngine.getInstance().getUIData().setAbilitySlots(abilityScroller.getOurAbilitySlots());
         }
+    }
+
+    @Override
+    public void onCodexDataGenerated() {
+        CodexEntryPlugin plugin = CodexDataV2.getEntry("codex_ability_AutoPilotWithGates");
+        plugin.addRelatedEntry("codex_ability_fracture_jump");
+        plugin.addRelatedEntry("codex_ability_gravitic_scan");
+        plugin.addRelatedEntry("codex_item_janus");
+        plugin.addRelatedEntry("codex_gallery_active_gate");
+        plugin.addRelatedEntry("codex_gallery_dead_gate");
+        plugin.addRelatedEntry("codex_gallery_jump_point_hyper");
+        plugin.addRelatedEntry("codex_gallery_jump_point_normal");
+        plugin.addRelatedEntry("codex_gallery_gate_hauler1");
+        plugin.addRelatedEntry("codex_gallery_gate_hauler2");
     }
 
     protected void registerGateIterator() {

@@ -27,26 +27,18 @@ import data.scripts.autopilotwithgates.util.GateAutoPilotRuleMemory;
 import data.scripts.autopilotwithgates.util.GateFinder;
 import data.scripts.autopilotwithgates.util.UiUtil;
 
-import static data.scripts.autopilotwithgates.AutopilotWithGatesPlugin.lunalibEnabled;
+import static data.scripts.autopilotwithgates.AutoPilotWithGatesSettings.*;
+
 import static data.scripts.autopilotwithgates.AutopilotWithGatesPlugin.systemBifrostData;
 import static data.scripts.autopilotwithgates.AutopilotWithGatesPlugin.systemGateData;
 
-import lunalib.lunaSettings.LunaSettings;
 import com.fs.starfarer.api.impl.campaign.aotd_entities.BiFrostGateEntity;
 
 public class AutoPilotListenerWithBifrosts extends AutoPilotListener {
     private boolean areGatesBifrosts = false;
-    private boolean preferBifrostsInSystemsWithBoth = false;
     
     public AutoPilotListenerWithBifrosts(boolean abilityActive) {
         super(abilityActive);
-
-        if (lunalibEnabled) {
-            this.preferBifrostsInSystemsWithBoth = LunaSettings.getBoolean("autopilot_with_gates", "preferBifrostsInSystemsWithBoth");
-
-        } else {
-            this.preferBifrostsInSystemsWithBoth = Global.getSettings().getBoolean("gateAutopilot_preferBifrostsInSystemsWithBoth");
-        }
     }
 
     @Override
@@ -398,7 +390,7 @@ public class AutoPilotListenerWithBifrosts extends AutoPilotListener {
                 
             });
 
-            if (this.autoJump) {
+            if (AUTOJUMP) {
                 jump.run();
                 return;
             }
@@ -445,7 +437,7 @@ public class AutoPilotListenerWithBifrosts extends AutoPilotListener {
 
         if (playerContainingLoc == entryBifrost.gate.getContainingLocation() && playerContainingLoc == normEntryGate.gate.getContainingLocation()) {
             if (ultimateTargetContainingLoc == exitBifrost.gate.getContainingLocation() && ultimateTargetContainingLoc == normExitGate.gate.getContainingLocation()) {
-                if (this.preferBifrostsInSystemsWithBoth) return true;
+                if (PREFER_BIFROSTS_IN_SYSTEMS_WITH_BOTH) return true;
                 // calc dist in systems
                 Vector2f playerLoc = playerFleet.getLocation();
                 float distBifrost = GateFinder.getDistSq(entryBifrost.gate.getLocation(), playerLoc) + GateFinder.getDistSq(exitBifrost.gate.getLocation(), ultimateTarget.getLocation());
@@ -457,7 +449,7 @@ public class AutoPilotListenerWithBifrosts extends AutoPilotListener {
 
         if (entryBifrost.gate.getContainingLocation() == normEntryGate.gate.getContainingLocation()) {
             if (ultimateTargetContainingLoc == exitBifrost.gate.getContainingLocation() && ultimateTargetContainingLoc == normExitGate.gate.getContainingLocation()) {
-                if (this.preferBifrostsInSystemsWithBoth) return true;
+                if (PREFER_BIFROSTS_IN_SYSTEMS_WITH_BOTH) return true;
                 
                 Vector2f ultimateTargetLoc = ultimateTarget.getLocation();
 

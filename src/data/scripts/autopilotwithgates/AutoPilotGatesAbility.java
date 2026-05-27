@@ -25,12 +25,12 @@ import com.fs.starfarer.api.impl.campaign.ids.Tags;
 import com.fs.starfarer.api.impl.campaign.intel.BaseIntelPlugin;
 
 import com.fs.starfarer.api.input.InputEventAPI;
+
 import com.fs.starfarer.api.ui.LabelAPI;
 import com.fs.starfarer.api.ui.TooltipMakerAPI;
 import com.fs.starfarer.api.ui.UIPanelAPI;
 
 import com.fs.starfarer.api.util.Misc;
-import com.fs.starfarer.campaign.CampaignEngine;
 import com.fs.starfarer.ui.impl.StandardTooltipV2Expandable;
 
 import data.scripts.autopilotwithgates.util.CampaignEntityPickerInstantiator.DialogDismissedListener;
@@ -38,6 +38,7 @@ import data.scripts.autopilotwithgates.util.UiUtil;
 
 import static data.scripts.autopilotwithgates.util.UiUtil.utils;
 
+import static data.scripts.autopilotwithgates.AutoPilotWithGatesSettings.*;
 import static data.scripts.autopilotwithgates.AutopilotWithGatesPlugin.listener;
 import static data.scripts.autopilotwithgates.AutopilotWithGatesPlugin.isBifrostUsable;
 import static data.scripts.autopilotwithgates.util.CampaignEntityPickerInstantiator.showCampaignEntityPicker;
@@ -51,13 +52,21 @@ public class AutoPilotGatesAbility extends BaseToggleAbility {
                 "paraFont",
                 String.class
             );
+
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
     }
 
     private static boolean isShowingEntityPicker = false;
-    public static int BLACKLIST_DIALOG_HOTKEY;
+
+    public static String tooltipStringDesc = Global.getSettings().getString("gateAutopilot_tooltipStringDesc");
+    public static String tooltipStringDescGreen = Global.getSettings().getString("gateAutopilot_tooltipStringDescGreen");
+    public static String tooltipStringDescRed = Global.getSettings().getString("gateAutopilot_tooltipStringDescRed");
+
+    public static String tooltipStringBLAdd = Global.getSettings().getString("gateAutopilot_tooltipStringBLAdd");
+    public static String tooltipStringBLRemove = Global.getSettings().getString("gateAutopilot_tooltipStringBLRemove");
+    public static String shiftKeyName = Global.getSettings().getString("gateAutopilot_shiftKeyName");
 
     private static boolean isPaused;
     private static final Object dialogDismissed = new DialogDismissedListener() {
@@ -68,6 +77,27 @@ public class AutoPilotGatesAbility extends BaseToggleAbility {
             utils.campaignUISetDialogType(Global.getSector().getCampaignUI(), null);
         }
     }.getProxy();
+
+    private static final BaseCustomUIPanelPlugin keyCapturePlugin = new BaseCustomUIPanelPlugin() {
+        @Override
+        public void processInput(List<InputEventAPI> events) {
+            for (InputEventAPI event : events) {
+                if (event.isConsumed() || isShowingEntityPicker) continue;
+
+                if (event.isKeyDownEvent()) {
+                    if (event.getEventValue() == BLACKLIST_DIALOG_HOTKEY) {
+                        event.consume();
+                        if (event.isShiftDown()) {
+                            showRemoveFromBlacklistDialog();
+                        } else {
+                            showAddToBlacklistDialog();
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+    };
 
     public AutoPilotGatesAbility() {
         super();
@@ -266,46 +296,30 @@ public class AutoPilotGatesAbility extends BaseToggleAbility {
     public void createTooltip(TooltipMakerAPI tooltip, boolean arg1) {
         Color gray = Misc.getGrayColor();
         String status = this.isActive() ? " (on)" : " (off)";
-        BaseCustomUIPanelPlugin keyCapturePlugin = null;
+        boolean useKeyCapture = false;
         
         if (!Global.CODEX_TOOLTIP_MODE) {
             LabelAPI title = tooltip.addTitle(this.spec.getName() + status);
             title.highlightLast(status);
             title.setHighlightColor(gray);
 
-            if (Global.getCurrentState() == GameState.CAMPAIGN) {
-                keyCapturePlugin = new BaseCustomUIPanelPlugin() {
-                    @Override
-                    public void processInput(List<InputEventAPI> events) {
-                        for (InputEventAPI event : events) {
-                            if (event.isConsumed() || isShowingEntityPicker) continue;
-
-                            if (event.isKeyDownEvent()) {
-                                if (event.getEventValue() == BLACKLIST_DIALOG_HOTKEY) {
-                                    event.consume();
-                                    if (event.isShiftDown()) {
-                                        showRemoveFromBlacklistDialog();
-                                    } else {
-                                        showAddToBlacklistDialog();
-                                    }
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                };
-            }
+            if (Global.getCurrentState() == GameState.CAMPAIGN)
+                useKeyCapture = true;
+            
         } else {
             tooltip.addSpacer(-10.0F);
         }
 
-        tooltip.addPara("Automatically sets the autopilot course target to the nearest gate to the fleet and links to the gate nearest to the ultimate autopilot course target.\n\nIf the non-gate route costs less fuel than the gate route, then the default course arrow will be green. Otherwise, it will be red.", 10f);
-        if (keyCapturePlugin != null) {
+        tooltip.addPara(tooltipStringDesc, 10f, TOOLTIP_PARA_COLORS, tooltipStringDescGreen, tooltipStringDescRed);
+        if (useKeyCapture) {
             tooltip.addCustom(Global.getSettings().createCustom(0f, 0f, keyCapturePlugin), 0f);
+            
             String paraFont = (String) paraFontHandle.get(tooltip);
             tooltip.setParaFont("graphics/fonts/orbitron12condensed.fnt");
-            tooltip.addParaWithMarkup("Press {{%s}} to add gates to a blacklist for the autopilot to ignore", 5f, Keyboard.getKeyName(BLACKLIST_DIALOG_HOTKEY).toUpperCase()).setColor(gray);
-            tooltip.addParaWithMarkup("Press {{%s}} to remove gates from the blacklist", 2f, "SHIFT + " + Keyboard.getKeyName(BLACKLIST_DIALOG_HOTKEY).toUpperCase()).setColor(gray);
+
+            String keyName = Keyboard.getKeyName(BLACKLIST_DIALOG_HOTKEY).toUpperCase();
+            tooltip.addParaWithMarkup(tooltipStringBLAdd, 5f, keyName).setColor(gray);
+            tooltip.addParaWithMarkup(tooltipStringBLRemove, 2f, shiftKeyName + " + " + keyName).setColor(gray);
             tooltip.setParaFont(paraFont);
         }
     }

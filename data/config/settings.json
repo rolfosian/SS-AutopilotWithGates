@@ -1,5 +1,14 @@
 {
     "gateAutopilot_LY_DIST_TOLERANCE" : "0.2",
+
+    # Ability tooltip strings, change for language or whatever if desired
+    "gateAutopilot_tooltipStringDesc" : "Automatically sets the autopilot course target to the nearest gate to the fleet and links to the gate nearest to the ultimate autopilot course target.\n\nIf the non-gate route costs less fuel than the gate route, then the default course arrow will be %s. Otherwise, it will be %s.",
+    "gateAutopilot_tooltipStringDescGreen" : "GREEN", # Corresponds to first %s in above description
+    "gateAutopilot_tooltipStringDescRed" : "RED", # Corresponds to second %s in above description
+
+    "gateAutopilot_tooltipStringBLAdd" : "Press {{%s}} to add gates to a blacklist for the autopilot to ignore",
+    "gateAutopilot_tooltipStringBLRemove" : "Press {{%s}} to remove gates from the blacklist",
+    "gateAutopilot_shiftKeyName" : "SHIFT",
     
     # If lunalib is enabled, use Luna Settings in game instead for these options
     "gateAutopilot_autoJump" : false, # If true, autopilot jumps automatically when reaching gates
