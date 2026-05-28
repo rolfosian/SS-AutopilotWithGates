@@ -317,9 +317,8 @@ public class AutoPilotGatesAbility extends BaseToggleAbility {
             String paraFont = (String) paraFontHandle.get(tooltip);
             tooltip.setParaFont("graphics/fonts/orbitron12condensed.fnt");
 
-            String keyName = Keyboard.getKeyName(BLACKLIST_DIALOG_HOTKEY).toUpperCase();
-            tooltip.addParaWithMarkup(tooltipStringBLAdd, 5f, keyName).setColor(gray);
-            tooltip.addParaWithMarkup(tooltipStringBLRemove, 2f, shiftKeyName + " + " + keyName).setColor(gray);
+            tooltip.addParaWithMarkup(tooltipStringBLAdd, 5f, BLACKLIST_DIALOG_HOTKEY_NAME).setColor(gray);
+            tooltip.addParaWithMarkup(tooltipStringBLRemove, 2f, shiftKeyName + " + " + BLACKLIST_DIALOG_HOTKEY_NAME).setColor(gray);
             tooltip.setParaFont(paraFont);
         }
     }
