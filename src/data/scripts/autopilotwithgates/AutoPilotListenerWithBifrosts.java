@@ -71,32 +71,25 @@ public class AutoPilotListenerWithBifrosts extends AutoPilotListener {
 
         boolean validGates = false;
         boolean validBifrosts = false;
-        
-        if (playerLoc.isHyperspace()) {
-            exitNormGate = GateFinder.getNearestGate(systemGateData, this.currentUltimateTarget);
 
+        exitNormGate = GateFinder.getNearestGate(systemGateData, this.currentUltimateTarget);
+        exitBifrost = GateFinder.getNearestGate(systemBifrostData, this.currentUltimateTarget);
+
+        if (playerLoc.isHyperspace()) {
             if (exitNormGate != null) {
                 entryNormGate = GateFinder.getNearestGateToPlayerOutsideLocation(systemGateData, exitNormGate.gate, this.currentUltimateTarget);
                 validGates = entryNormGate != null;
             }
-
-            exitBifrost = GateFinder.getNearestGate(systemBifrostData, this.currentUltimateTarget);
             if (exitBifrost != null) {
                 entryBifrost = GateFinder.getNearestGateToPlayerOutsideLocation(systemBifrostData, exitBifrost.gate, this.currentUltimateTarget);
                 validBifrosts = entryBifrost != null;
             }
-
         } else {
-            exitBifrost = GateFinder.getNearestGate(systemBifrostData, this.currentUltimateTarget);
-
             if (exitBifrost != null) {
                 entryBifrost = GateFinder.getNearestBifrostInLocation(playerLoc, playerFleet.getLocation());
                 if (entryBifrost == null) entryBifrost = GateFinder.getNearestGateToPlayerOutsideLocation(systemBifrostData, exitBifrost.gate, this.currentUltimateTarget);
                 validBifrosts = entryBifrost != null;
             }
-
-            exitNormGate = GateFinder.getNearestGate(systemGateData, this.currentUltimateTarget);
-
             if (exitNormGate != null) {
                 entryNormGate = GateFinder.getNearestGateInLocation(playerLoc, playerFleet.getLocation());
                 if (entryNormGate == null) entryNormGate = GateFinder.getNearestGateToPlayerOutsideLocation(systemGateData, exitNormGate.gate, this.currentUltimateTarget);
