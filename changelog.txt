@@ -39,3 +39,18 @@ Version 0.0.6a
 Version 0.0.6b
 
 - Fixed bug introduced with last patch that made it so autopilot was overriding the interaction target if the player fleet was following a direct command when game saved
+
+Version 0.1.3
+
+- Added blacklist for player to add gates to that they want the autopilot to ignore - accessed via hotkey with mouseover tooltip showing on ability bar
+    There is a lunalib or settings.json config option to change the hotkey for this if desired
+
+- Integrated the Ashes of the Domain - Vaults of Knowledge Bifrost gate network.
+    Includes backwards compatibility for pre-5.x versions.
+    If Bifrost gates are being used by the autopilot then the circles for the gate course on the hyperspace map will be colored cyan
+
+- Added settings option for the autopilot to prefer Bifrost Gates every time if the connection is off cooldown and they share the same entry/exit systems as the resolved route for normal gates
+- Added LunaSettingsListener, settings with lunalib enabled will now take immediately if saved during campaign gameplay and won't have to wait for save reload
+
+- Moved ability tooltip strings to settings.json for localization support (Can also be assigned programmatically by setting the appropriate static fields in data.scripts.autopilotwithgates.AutoPilotGatesAbility)
+- Polished ability tooltip, added some related codex entries
