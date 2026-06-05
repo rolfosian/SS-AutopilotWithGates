@@ -142,9 +142,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
     @Override
     public void advance(float dt) {
         if (!this.abilityActive) return;
-
         CampaignUIAPI campaignUI = Global.getSector().getCampaignUI();
-        if (utils.getCourseWidget(campaignUI) == null) return;
 
         SectorEntityToken ultimateTarget = campaignUI.getUltimateCourseTarget();
         if (ultimateTarget == null) {

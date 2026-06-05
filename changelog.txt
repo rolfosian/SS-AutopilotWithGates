@@ -54,3 +54,7 @@ Version 0.1.3
 
 - Moved ability tooltip strings to settings.json for localization support (Can also be assigned programmatically by setting the appropriate static fields in data.scripts.autopilotwithgates.AutoPilotGatesAbility)
 - Polished ability tooltip, added some related codex entries
+
+Version 0.1.3a
+
+- Fixed crash on game save when ability isnt unlocked

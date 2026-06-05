@@ -5,7 +5,6 @@ import java.util.*;
 import org.lwjgl.opengl.Display;
 
 import com.fs.starfarer.api.BaseModPlugin;
-import com.fs.starfarer.api.EveryFrameScript;
 import com.fs.starfarer.api.GameState;
 import com.fs.starfarer.api.Global;
 import com.fs.starfarer.api.util.IntervalUtil;
@@ -97,6 +96,7 @@ public class AutopilotWithGatesPlugin extends BaseModPlugin {
         if (listener != null) {
             if (!listener.getMaps().isEmpty()) listener.getMaps().clear();
             listener.removeArrowRenderer();
+            listener = null;
         }
 
         if (GateEntityPlugin.canUseGates() || canUseBifrosts()) {
@@ -201,6 +201,18 @@ public class AutopilotWithGatesPlugin extends BaseModPlugin {
     private SectorEntityToken interactionTarget = null;
     @Override
     public void beforeGameSave() {
+        if (abilityScroller != null) {
+            AbilitySlots oldAbilitySlots = abilityScroller.getOldAbilitySlots();
+            AbilitySlots ourAbilitySlots = abilityScroller.getOurAbilitySlots();
+            
+            oldAbilitySlots.setCurrBarIndex(ourAbilitySlots.getCurrBarIndex());
+            oldAbilitySlots.setLocked(ourAbilitySlots.isLocked());
+
+            CampaignEngine.getInstance().getUIData().setAbilitySlots(oldAbilitySlots);
+        }
+
+        if (listener == null) return;
+
         this.followMouse = Global.getSector().getCampaignUI().isPlayerFleetFollowingMouse();
         this.followingDirectCommand = Global.getSector().getCampaignUI().isFollowingDirectCommand();
         this.interactionTarget = Global.getSector().getPlayerFleet().getInteractionTarget();
@@ -210,20 +222,22 @@ public class AutopilotWithGatesPlugin extends BaseModPlugin {
 
         this.arrowRenderingLoc = listener.getArrowRenderingLoc();
         if (this.arrowRenderingLoc != null) listener.removeArrowRenderer();
-
-        if (abilityScroller != null) {
-            AbilitySlots oldAbilitySlots = abilityScroller.getOldAbilitySlots();
-            AbilitySlots ourAbilitySlots = abilityScroller.getOurAbilitySlots();
-            
-            oldAbilitySlots.setCurrBarIndex(ourAbilitySlots.getCurrBarIndex());
-            oldAbilitySlots.setLocked(ourAbilitySlots.isLocked());
-
-            CampaignEngine.getInstance().getUIData().setAbilitySlots(oldAbilitySlots);
-        } 
     }
 
     @Override
     public void afterGameSave() {
+        if (abilityScroller != null)  {
+            CampaignEngine.getInstance().getUIData().setAbilitySlots(abilityScroller.getOurAbilitySlots());
+        }
+
+        if (listener == null) {
+            this.followMouse = false;
+            this.followingDirectCommand = false;
+            this.interactionTarget = null;
+            this.arrowRenderingLoc = null;
+            return;
+        }
+
         SectorEntityToken entry = listener.getEntryGate() != null ? listener.getEntryGate().gate : null;
         if (entry != null) {
             this.layInCourseFor(entry);
@@ -243,10 +257,6 @@ public class AutopilotWithGatesPlugin extends BaseModPlugin {
         if (this.arrowRenderingLoc != null) {
             listener.addArrowRenderer(this.arrowRenderingLoc);
             this.arrowRenderingLoc = null;
-        }
-
-        if (abilityScroller != null)  {
-            CampaignEngine.getInstance().getUIData().setAbilitySlots(abilityScroller.getOurAbilitySlots());
         }
     }
 
