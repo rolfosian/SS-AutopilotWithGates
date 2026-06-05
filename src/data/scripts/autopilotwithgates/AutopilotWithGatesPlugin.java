@@ -31,6 +31,7 @@ import com.fs.starfarer.campaign.CampaignEngine;
 import com.fs.starfarer.campaign.CampaignUIPersistentData.AbilitySlots;
 
 import data.scripts.autopilotwithgates.util.AoTDVersionOverride;
+import data.scripts.autopilotwithgates.util.BaseEveryFrameScript;
 import data.scripts.autopilotwithgates.util.GateFinder;
 import data.scripts.autopilotwithgates.util.Refl;
 import data.scripts.autopilotwithgates.util.UiUtil;
@@ -45,8 +46,8 @@ public class AutopilotWithGatesPlugin extends BaseModPlugin {
     private static AutopilotWithGatesPlugin instance;
 
     private Thread systemGateIteratorThread;
-    private static volatile boolean iteratorRunning = true;
     public static final Object systemGateIteratorLock = new Object();
+    private static volatile boolean iteratorRunning = true;
     
     public static volatile Map<LocationAPI, SystemGateData> systemsToGates = new HashMap<>();
     public static volatile Map<LocationAPI, SystemGateData> systemsToBifrosts = new HashMap<>();
@@ -77,11 +78,12 @@ public class AutopilotWithGatesPlugin extends BaseModPlugin {
     public void onGameLoad(boolean newGame) {
         SectorAPI sector = Global.getSector();
         Map<String, Object> persistentData = sector.getPersistentData();
-        Boolean abilityActive = (Boolean) persistentData.get("$autopilotWithGatesAbility");
+        final Boolean[] abilityActif = new Boolean[1];
+        abilityActif[0] = (Boolean) persistentData.get("$autopilotWithGatesAbility");
 
-        if (abilityActive == null) {
+        if (abilityActif[0] == null) {
             persistentData.put("$autopilotWithGatesAbility", false);
-            abilityActive = false;
+            abilityActif[0] = false;
         }
 
         if (systemGateIteratorThread != null) {
@@ -97,34 +99,42 @@ public class AutopilotWithGatesPlugin extends BaseModPlugin {
             listener.removeArrowRenderer();
         }
 
-        listener = aotdEnabled ? new AutoPilotListenerWithBifrosts(abilityActive) : new AutoPilotListener(abilityActive);
-        sector.addTransientListener(listener);
-        sector.addTransientScript(listener);
-
         if (GateEntityPlugin.canUseGates() || canUseBifrosts()) {
-            CampaignFleetAPI playerFleet = sector.getPlayerFleet();
+            sector.addTransientScript(new BaseEveryFrameScript(true) {
+                int f = 0;
+                @Override
+                public void advance(float arg0) {
+                    if (++f < 2) return;
 
-            if (!playerFleet.hasAbility("AutoPilotWithGates")) {
-                sector.getCharacterData().addAbility("AutoPilotWithGates");
-                playerFleet.addAbility("AutoPilotWithGates");
+                    listener = aotdEnabled ? new AutoPilotListenerWithBifrosts(abilityActif[0]) : new AutoPilotListener(abilityActif[0]);
+                    sector.addTransientListener(listener);
+                    sector.addTransientScript(listener);
 
-                listener.setAbility((AutoPilotGatesAbility) Global.getSector().getPlayerFleet().getAbility("AutoPilotWithGates"));
-                sector.getCampaignUI().addMessage(UiUtil.unlockedMessagePlugin, MessageClickAction.NOTHING);
+                    CampaignFleetAPI playerFleet = sector.getPlayerFleet();
 
-            } else if (listener.getAbility() == null) {
-                AutoPilotGatesAbility ability = (AutoPilotGatesAbility) Global.getSector().getPlayerFleet().getAbility("AutoPilotWithGates");
-                listener.setAbility(ability);
-            }
+                    if (!playerFleet.hasAbility("AutoPilotWithGates")) {
+                        sector.getCharacterData().addAbility("AutoPilotWithGates");
+                        playerFleet.addAbility("AutoPilotWithGates");
 
-            registerGateIterator();
+                        listener.setAbility((AutoPilotGatesAbility) Global.getSector().getPlayerFleet().getAbility("AutoPilotWithGates"));
+                        sector.getCampaignUI().addMessage(UiUtil.unlockedMessagePlugin, MessageClickAction.NOTHING);
 
+                    } else if (listener.getAbility() == null) {
+                        AutoPilotGatesAbility ability = (AutoPilotGatesAbility) Global.getSector().getPlayerFleet().getAbility("AutoPilotWithGates");
+                        listener.setAbility(ability);
+                    }
+
+                    registerGateIterator();
+                    this.isDone = true;
+                    sector.removeTransientScript(this);
+                }
+            });
         } else {
             sector.getCharacterData().removeAbility("AutoPilotWithGates");
             sector.getPlayerFleet().removeAbility("AutoPilotWithGates");
 
-            sector.addTransientScript(new EveryFrameScript() {
+            sector.addTransientScript(new BaseEveryFrameScript(true) {
                 private IntervalUtil interval = new IntervalUtil(0.5f, 0.5f);
-                private boolean isDone = false;
                 @Override
                 public void advance(float arg0) {
                     interval.advance(arg0);
@@ -140,19 +150,9 @@ public class AutopilotWithGatesPlugin extends BaseModPlugin {
 
                         Global.getSector().getCampaignUI().addMessage(UiUtil.unlockedMessagePlugin, MessageClickAction.NOTHING);
 
-                        isDone = true;
+                        this.isDone = true;
                         Global.getSector().removeTransientScript(this);
                     }
-                }
-
-                @Override
-                public boolean isDone() {
-                    return isDone;
-                }
-
-                @Override
-                public boolean runWhilePaused() {
-                    return true;
                 }
             });
         }
@@ -165,8 +165,7 @@ public class AutopilotWithGatesPlugin extends BaseModPlugin {
         }
 
         if (ABILITY_SCROLL) {
-            Global.getSector().addTransientScript(new EveryFrameScript() {
-                private boolean isDone = false;
+            Global.getSector().addTransientScript(new BaseEveryFrameScript(true) {
                 private int f = 0;
     
                 @Override
@@ -183,16 +182,6 @@ public class AutopilotWithGatesPlugin extends BaseModPlugin {
     
                     this.isDone = true;
                     Global.getSector().removeTransientScript(this); 
-                }
-    
-                @Override
-                public boolean isDone() {
-                    return this.isDone;
-                }
-    
-                @Override
-                public boolean runWhilePaused() {
-                    return true;
                 }
             });
         }

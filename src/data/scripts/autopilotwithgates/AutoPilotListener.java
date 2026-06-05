@@ -48,6 +48,7 @@ import com.fs.starfarer.api.ui.UIPanelAPI;
 
 import com.fs.starfarer.api.util.Misc;
 
+import data.scripts.autopilotwithgates.util.BaseEveryFrameScript;
 import data.scripts.autopilotwithgates.util.GateAutoPilotRuleMemory;
 import data.scripts.autopilotwithgates.util.GateFinder;
 import data.scripts.autopilotwithgates.util.TreeTraverser;
@@ -371,9 +372,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                         ListenerUtil.reportFleetTransitingGate(playerFleet, interactionTarget, exit);
 
                         // AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
-                        Global.getSector().addTransientScript(new EveryFrameScript() {
-                            private boolean isDone = false;
-
+                        Global.getSector().addTransientScript(new BaseEveryFrameScript(true) {
                             @Override
                             public void advance(float arg0) {
                                 if (Global.getSector().getPlayerFleet().getContainingLocation() != exit.getContainingLocation()) return;
@@ -383,16 +382,6 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
 
                                 this.isDone = true;
                                 Global.getSector().removeTransientScript(this);
-                            }
-
-                            @Override
-                            public boolean isDone() {
-                                return this.isDone;
-                            }
-
-                            @Override
-                            public boolean runWhilePaused() {
-                                return true;
                             }
                         });
 
@@ -404,9 +393,7 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                     }
                 };
 
-                Global.getSector().addTransientScript(new EveryFrameScript() {
-                    private boolean isDone = false;
-
+                Global.getSector().addTransientScript(new BaseEveryFrameScript(true) {
                     @Override
                     public void advance(float arg0) {
                         if (Global.getSector().getCampaignUI().getCurrentInteractionDialog() == null) {
@@ -432,17 +419,6 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                             return;
                         }
                     }
-
-                    @Override
-                    public boolean isDone() {
-                        return this.isDone;
-                    }
-
-                    @Override
-                    public boolean runWhilePaused() {
-                        return true;
-                    }
-                    
                 });
 
                 if (AUTOJUMP) {
