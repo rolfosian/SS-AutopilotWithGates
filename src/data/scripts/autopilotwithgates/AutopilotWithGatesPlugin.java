@@ -76,14 +76,6 @@ public class AutopilotWithGatesPlugin extends BaseModPlugin {
     @Override
     public void onGameLoad(boolean newGame) {
         SectorAPI sector = Global.getSector();
-        Map<String, Object> persistentData = sector.getPersistentData();
-        final Boolean[] abilityActif = new Boolean[1];
-        abilityActif[0] = (Boolean) persistentData.get("$autopilotWithGatesAbility");
-
-        if (abilityActif[0] == null) {
-            persistentData.put("$autopilotWithGatesAbility", false);
-            abilityActif[0] = false;
-        }
 
         if (systemGateIteratorThread != null) {
             iteratorRunning = false;
@@ -100,13 +92,16 @@ public class AutopilotWithGatesPlugin extends BaseModPlugin {
         }
 
         if (GateEntityPlugin.canUseGates() || canUseBifrosts()) {
+            
+            boolean abilityActive = (boolean) sector.getPersistentData().computeIfAbsent("$autopilotWithGatesAbility", k-> false);
+
             sector.addTransientScript(new BaseEveryFrameScript(true) {
                 int f = 0;
                 @Override
                 public void advance(float arg0) {
                     if (++f < 2) return;
 
-                    listener = aotdEnabled ? new AutoPilotListenerWithBifrosts(abilityActif[0]) : new AutoPilotListener(abilityActif[0]);
+                    listener = aotdEnabled ? new AutoPilotListenerWithBifrosts(abilityActive) : new AutoPilotListener(abilityActive);
                     sector.addTransientListener(listener);
                     sector.addTransientScript(listener);
 
