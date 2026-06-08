@@ -120,6 +120,14 @@ public class Refl {
         }
     }
 
+    public static String getMethodName(Object method) {
+        try {
+            return (String) getMethodNameHandle.invoke(method);
+        } catch (Throwable e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     public static Object getMethodExplicit(String methodName, Class<?> cls, Class<?>[] parameterTypes) {
         for (Object method : cls.getDeclaredMethods()) {
             try {

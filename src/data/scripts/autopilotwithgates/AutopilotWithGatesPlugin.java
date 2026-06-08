@@ -92,7 +92,7 @@ public class AutopilotWithGatesPlugin extends BaseModPlugin {
         }
 
         if (GateEntityPlugin.canUseGates() || canUseBifrosts()) {
-            
+
             boolean abilityActive = (boolean) sector.getPersistentData().computeIfAbsent("$autopilotWithGatesAbility", k-> false);
 
             sector.addTransientScript(new BaseEveryFrameScript(true) {

@@ -2,6 +2,7 @@ package data.scripts.autopilotwithgates.util;
 
 import java.util.LinkedList;
 import java.util.List;
+import java.awt.Color;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
@@ -21,6 +22,8 @@ import com.fs.starfarer.api.campaign.SectorEntityToken;
 import com.fs.starfarer.api.campaign.comm.IntelInfoPlugin;
 import com.fs.starfarer.api.impl.campaign.intel.BaseIntelPlugin;
 import com.fs.starfarer.api.ui.ButtonAPI;
+import com.fs.starfarer.api.ui.Fonts;
+import com.fs.starfarer.api.ui.LabelAPI;
 import com.fs.starfarer.api.ui.PositionAPI;
 import com.fs.starfarer.api.ui.TooltipMakerAPI;
 import com.fs.starfarer.api.ui.UIComponentAPI;
@@ -30,8 +33,11 @@ import com.fs.starfarer.campaign.BaseLocation;
 import com.fs.starfarer.campaign.CampaignState;
 import com.fs.starfarer.campaign.CampaignUIPersistentData.AbilitySlot;
 import com.fs.starfarer.campaign.CampaignUIPersistentData.AbilitySlots;
+import com.fs.starfarer.campaign.command.AdminPickerDialog;
 import com.fs.starfarer.campaign.comms.v2.EventsPanel;
 import com.fs.starfarer.campaign.fleet.CampaignFleet;
+import com.fs.starfarer.campaign.ui.UITable;
+import com.fs.starfarer.ui.impl.StandardTooltipV2;
 import com.fs.starfarer.ui.newui.CampaignEntityPickerDialog;
 
 import data.scripts.autopilotwithgates.org.objectweb.asm.*;
@@ -56,6 +62,7 @@ public class UiUtil implements Opcodes {
         public Object campaignUIGetDialogType(Object campaignUI);
         public void campaignUISetDialogType(Object campaignUI, Object dialogTypeEnum);
         public UIPanelAPI confirmDialogGetInnerPanel(Object confirmDialog);
+        public LabelAPI confirmDialogGetLabel(Object confirmDialog);
 
         public EventsPanel getEventsPanel(Object intelTab);
         public ButtonAPI intelTabGetPlanetsButton(Object intelTab);
@@ -83,10 +90,29 @@ public class UiUtil implements Opcodes {
 
         public void buttonSetListener(Object button, Object listener);
         public Object buttonGetListener(Object button);
+        public Fader buttonGetGlowFader(Object button);
+
+        public List<Object> uiTableGetRows(UITable table);
+        public void uiTableAddRow(UITable table, Object row);
+        public void uiTableRemoveRow(UITable table, Object row);
+        public Object uiTableGetRowForData(UITable table, Object data);
+        public UIPanelAPI uiTableRowGetCol(Object row, int col);
+        public ButtonAPI uiTableRowGetButton(Object row);
+        public void uiTableRowRender(Object row, float alphaMult);
+        public void uiTableRowSetButton(Object row, Object button);
+        public Object uiTableRowGetData(Object row);
+        public void uiTableRowSetData(Object row, Object data); // data type is actually java.lang.Object, no cast required
+
+        public Object uiTableGetSelected(UITable table);
+        public void uiTableSelect(UITable table, Object row, Object inputEvent);
+        public void uiTableSelect(UITable table, Object row, Object inputEvent, boolean notifyDelegate);
+        public UIPanelAPI uiTableGetList(UITable table);
         
         public Object uiComponentGetTooltip(Object uiComponent);
         public void uiComponentShowTooltip(Object uiComponent, Object tooltip);
         public void uiComponentHideTooltip(Object uiComponent, Object tooltip);
+        public UIPanelAPI getContents(Object tooltip);
+        public UIPanelAPI getParent(UIComponentAPI component);
 
         public List<UIComponentAPI> getChildrenNonCopy(UIPanelAPI uiPanel);
         public List<UIComponentAPI> getChildrenNonCopy(UIComponentAPI parent); // custom method with instanceof check uiPanelClass else return null
@@ -95,6 +121,8 @@ public class UiUtil implements Opcodes {
 
     // With this we can implement the above interface and generate a class at runtime to call obfuscated class methods platform agnostically without reflection overhead
     private static Class<?>[] implementUtilInterface(Class<?> coreClass, Class<?> abilityPanelClass, Class<?> actionListenerInterface) {
+        String listDesc = Type.getDescriptor(List.class);
+
         String coreClassInternalName = Type.getInternalName(coreClass);
 
         Class<?> interactionDialogClass = Refl.getFieldType(Refl.getFieldByName("encounterDialog", CampaignState.class));
@@ -113,6 +141,8 @@ public class UiUtil implements Opcodes {
         Class<?> uiPanelClass = mapClass.getSuperclass();
         Class<?> uiComponentClass = uiPanelClass.getSuperclass();
         Class<?> toolTipClass = Refl.getReturnType(Refl.getMethod("getTooltip", uiComponentClass));
+        Class<?> listPanelClass = Refl.getReturnType(Refl.getMethod("getListAdmins", AdminPickerDialog.class));
+
         String uiPanelInternalName = Type.getInternalName(uiPanelClass);
         String uiComponentInternalName = Type.getInternalName(uiComponentClass);
         String confirmDialogInternalName = Type.getInternalName(CampaignEntityPickerDialog.class.getSuperclass());
@@ -129,6 +159,17 @@ public class UiUtil implements Opcodes {
 
         Class<?> zoomTrackerClass = Refl.getReturnType(Refl.getMethod("getZoomTracker", mapClass));
         String[] zoomTrackerMethodNames = getZoomTrackerMethodNames(zoomTrackerClass);
+
+        TooltipMakerAPI tt = Global.getSettings().createCustom(0f,0f,null).createUIElement(0f,0f,false);
+        tt.beginTable(Global.getSettings().getBasePlayerColor(), Global.getSettings().getBasePlayerColor(), Global.getSettings().getBasePlayerColor(), 1f, false, false, new Object[]{"", 1f});
+        Class<?> uiTableRowSubClass = tt.addRowWithGlow("").getClass();
+        Class<?> uiTableRowSuperSuperClass = Refl.getReturnType((Refl.getMethod("getSelected", UITable.class)));
+
+        String uiTableInternalName = Type.getInternalName(UITable.class);
+        String uiTableRowInternalName = Type.getInternalName(uiTableRowSuperSuperClass);
+        String uiTableDesc = Type.getDescriptor(UITable.class);
+        String uiTableRowDesc = Type.getDescriptor(uiTableRowSuperSuperClass);
+        // String uiTableRowSubClassInternalName = Type.getInternalName(uiTableRowSubClass);
         
         String superName = Type.getType(Object.class).getInternalName();
         String interfaceName = Type.getType(UtilInterface.class).getInternalName();
@@ -627,6 +668,36 @@ public class UiUtil implements Opcodes {
             mv.visitEnd();
         }
 
+        // public LabelAPI confirmDialogGetLabel(Object confirmDialog) {
+        //     return ((confirmDialogClass)confirmDialog).getLabel();
+        // }
+        {
+            MethodVisitor mv = cw.visitMethod(
+                ACC_PUBLIC,
+                "confirmDialogGetLabel",
+                "(Ljava/lang/Object;)" + Type.getDescriptor(LabelAPI.class),
+                null,
+                null
+            );
+            mv.visitCode();
+
+            mv.visitVarInsn(ALOAD, 1);
+            mv.visitTypeInsn(CHECKCAST, confirmDialogInternalName);
+
+            mv.visitMethodInsn(
+                INVOKEVIRTUAL,
+                confirmDialogInternalName,
+                "getLabel",
+                "()" + Type.getDescriptor(Global.getSettings().createLabel("", Fonts.DEFAULT_SMALL).getClass()),
+                false
+            );
+
+            mv.visitInsn(ARETURN);
+
+            mv.visitMaxs(0, 0);
+            mv.visitEnd();
+        }
+
         // public UIPanelAPI campaignUIGetScreenPanel(Object campaignUI) {
         //     return ((CampaignState)campaignUI).getScreenPanel();
         // }
@@ -940,6 +1011,36 @@ public class UiUtil implements Opcodes {
             mv.visitEnd();
         }
 
+        // public Object buttonGetHighlightFader(Object button) {
+        //     ((buttonClass)button).getHighlightFader();
+        // }
+        {
+            MethodVisitor mv = cw.visitMethod(
+                ACC_PUBLIC,
+                "buttonGetGlowFader",
+                "(Ljava/lang/Object;)" + Type.getDescriptor(Fader.class),
+                null,
+                null
+            );
+            mv.visitCode();
+
+            mv.visitVarInsn(ALOAD, 1);
+            mv.visitTypeInsn(CHECKCAST, buttonClassInternalName);
+
+            mv.visitMethodInsn(
+                INVOKEVIRTUAL,
+                buttonClassInternalName,
+                "getGlowFader",
+                "()" + Type.getDescriptor(Fader.class),
+                false
+            );
+
+            mv.visitInsn(ARETURN);
+
+            mv.visitMaxs(0, 0);
+            mv.visitEnd();
+        }
+
         // public Object buttonGetListener(Object button) {
         //     ((buttonClass)button).getListener();
         // }
@@ -964,6 +1065,500 @@ public class UiUtil implements Opcodes {
                 false
             );
 
+            mv.visitInsn(ARETURN);
+
+            mv.visitMaxs(0, 0);
+            mv.visitEnd();
+        }
+
+        // public List<Object> uiTableGetRows(UITable table) {
+        //     return table.getRows();
+        // }
+        {
+            MethodVisitor mv = cw.visitMethod(
+                ACC_PUBLIC,
+                "uiTableGetRows",
+                "(" + uiTableDesc + ")" + listDesc,
+                null,
+                null
+            );
+            mv.visitCode();
+
+            mv.visitVarInsn(ALOAD, 1);
+            mv.visitMethodInsn(
+                INVOKEVIRTUAL,
+                uiTableInternalName,
+                "getRows",
+                "()" + listDesc,
+                false
+            );
+
+            mv.visitInsn(ARETURN);
+
+            mv.visitMaxs(0, 0);
+            mv.visitEnd();
+        }
+
+        // public void uiTableAddRow(UITable table, Object row) {
+        //     table.addRow(row);
+        // }
+        {
+            MethodVisitor mv = cw.visitMethod(
+                ACC_PUBLIC,
+                "uiTableAddRow",
+                "(" + uiTableDesc + "Ljava/lang/Object;)V",
+                null,
+                null
+            );
+            mv.visitCode();
+
+            mv.visitVarInsn(ALOAD, 1);
+            mv.visitVarInsn(ALOAD, 2);
+            mv.visitTypeInsn(CHECKCAST, uiTableRowInternalName);
+
+            mv.visitMethodInsn(
+                INVOKEVIRTUAL,
+                uiTableInternalName,
+                "addRow",
+                "(" + uiTableRowDesc + ")V",
+                false
+            );
+
+            mv.visitInsn(RETURN);
+
+            mv.visitMaxs(0, 0);
+            mv.visitEnd();
+        }
+
+        // public void uiTableRemoveRow(UITable table, Object row) {
+        //     table.removeRow(row);
+        // }
+        {
+            MethodVisitor mv = cw.visitMethod(
+                ACC_PUBLIC,
+                "uiTableRemoveRow",
+                "(" + uiTableDesc + "Ljava/lang/Object;)V",
+                null,
+                null
+            );
+            mv.visitCode();
+
+            mv.visitVarInsn(ALOAD, 1);
+            mv.visitVarInsn(ALOAD, 2);
+            mv.visitTypeInsn(CHECKCAST, uiTableRowInternalName);
+
+            mv.visitMethodInsn(
+                INVOKEVIRTUAL,
+                uiTableInternalName,
+                "removeRow",
+                "(" + uiTableRowDesc + ")V",
+                false
+            );
+
+            mv.visitInsn(RETURN);
+
+            mv.visitMaxs(0, 0);
+            mv.visitEnd();
+        }
+
+        // public Object uiTableGetRowForData(UITable table, Object data) {
+        //     return table.getRowForData(data);
+        // }
+        {
+            Object getRowForDataMethod = Refl.getMethod("getRowForData", UITable.class);
+            String getRowForDataDesc = Type.getMethodDescriptor(getRowForDataMethod);
+            MethodVisitor mv = cw.visitMethod(
+                ACC_PUBLIC,
+                "uiTableGetRowForData",
+                "(" + uiTableDesc + "Ljava/lang/Object;)Ljava/lang/Object;",
+                null,
+                null
+            );
+            mv.visitCode();
+
+            mv.visitVarInsn(ALOAD, 1);
+            mv.visitVarInsn(ALOAD, 2);
+
+            mv.visitMethodInsn(
+                INVOKEVIRTUAL,
+                uiTableInternalName,
+                "getRowForData",
+                getRowForDataDesc,
+                false
+            );
+
+            mv.visitInsn(ARETURN);
+
+            mv.visitMaxs(0, 0);
+            mv.visitEnd();
+        }
+
+        // public UIPanelAPI uiTableRowGetCol(Object row, int col) {
+        //     return ((UITableRow)row).getCol(col);
+        // }
+        {
+            MethodVisitor mv = cw.visitMethod(
+                ACC_PUBLIC,
+                "uiTableRowGetCol",
+                "(Ljava/lang/Object;I)" + uiPanelAPIDesc,
+                null,
+                null
+            );
+            mv.visitCode();
+
+            mv.visitVarInsn(ALOAD, 1);
+            mv.visitTypeInsn(CHECKCAST, uiTableRowInternalName);
+
+            mv.visitVarInsn(ILOAD, 2);
+
+            mv.visitMethodInsn(
+                INVOKEVIRTUAL,
+                uiTableRowInternalName,
+                "getCol",
+                "(I)" + uiPanelDesc,
+                false
+            );
+
+            mv.visitInsn(ARETURN);
+
+            mv.visitMaxs(0, 0);
+            mv.visitEnd();
+        }
+
+        // public ButtonAPI uiTableRowGetButton(Object row) {
+        //     return ((UITableRow)row).getButton();
+        // }
+        {
+            MethodVisitor mv = cw.visitMethod(
+                ACC_PUBLIC,
+                "uiTableRowGetButton",
+                "(Ljava/lang/Object;)" + buttonAPIDesc,
+                null,
+                null
+            );
+            mv.visitCode();
+
+            mv.visitVarInsn(ALOAD, 1);
+            mv.visitTypeInsn(CHECKCAST, uiTableRowInternalName);
+
+            mv.visitMethodInsn(
+                INVOKEVIRTUAL,
+                uiTableRowInternalName,
+                "getButton",
+                "()" + buttonClassDesc,
+                false
+            );
+
+            mv.visitInsn(ARETURN);
+
+            mv.visitMaxs(0, 0);
+            mv.visitEnd();
+        }
+
+        // public void uiTableRowSetButton(Object row, Object button) {
+        //     ((UITableRow)row).setButton((Button)button);
+        // }
+        {
+            MethodVisitor mv = cw.visitMethod(
+                ACC_PUBLIC,
+                "uiTableRowSetButton",
+                "(Ljava/lang/Object;Ljava/lang/Object;)V",
+                null,
+                null
+            );
+            mv.visitCode();
+
+            mv.visitVarInsn(ALOAD, 1);
+            mv.visitTypeInsn(CHECKCAST, uiTableRowInternalName);
+
+            mv.visitVarInsn(ALOAD, 2);
+            mv.visitTypeInsn(CHECKCAST, buttonClassInternalName);
+
+            mv.visitMethodInsn(
+                INVOKEVIRTUAL,
+                uiTableRowInternalName,
+                "setButton",
+                "(" + buttonClassDesc + ")V",
+                false
+            );
+
+            mv.visitInsn(RETURN);
+
+            mv.visitMaxs(0, 0);
+            mv.visitEnd();
+        }
+
+        // public Object uiTableRowGetData(Object row) {
+        //     return ((UITableRow)row).getData();
+        // }
+        {
+            MethodVisitor mv = cw.visitMethod(
+                ACC_PUBLIC,
+                "uiTableRowGetData",
+                "(Ljava/lang/Object;)Ljava/lang/Object;",
+                null,
+                null
+            );
+            mv.visitCode();
+
+            mv.visitVarInsn(ALOAD, 1);
+            mv.visitTypeInsn(CHECKCAST, uiTableRowInternalName);
+
+            mv.visitMethodInsn(
+                INVOKEVIRTUAL,
+                uiTableRowInternalName,
+                "getData",
+                "()Ljava/lang/Object;",
+                false
+            );
+
+            mv.visitInsn(ARETURN);
+
+            mv.visitMaxs(0, 0);
+            mv.visitEnd();
+        }
+
+        // public void uiTableRowRender(Object row, float alphaMult) {
+        //     ((uiTableRowSuperClass)row).render(alphaMult);
+        // }
+        {
+            String superInternalName = Type.getInternalName(uiTableRowSubClass.getSuperclass());
+            MethodVisitor mv = cw.visitMethod(
+                ACC_PUBLIC,
+                "uiTableRowRender",
+                "(Ljava/lang/Object;F)V",
+                null,
+                null
+            );
+            mv.visitCode();
+
+            mv.visitVarInsn(ALOAD, 1);
+            mv.visitTypeInsn(CHECKCAST, superInternalName);
+            mv.visitVarInsn(FLOAD, 2);
+            mv.visitMethodInsn(
+                INVOKEVIRTUAL,
+                superInternalName,
+                "render",
+                "(F)V",
+                false
+            );
+
+            mv.visitInsn(RETURN);
+
+            mv.visitMaxs(0, 0);
+            mv.visitEnd();
+        }
+
+        // public void uiTableRowSetData(Object row, Object data) {
+        //     ((UITableRow)row).setData(data);
+        // }
+        {
+            MethodVisitor mv = cw.visitMethod(
+                ACC_PUBLIC,
+                "uiTableRowSetData",
+                "(Ljava/lang/Object;Ljava/lang/Object;)V",
+                null,
+                null
+            );
+            mv.visitCode();
+
+            mv.visitVarInsn(ALOAD, 1);
+            mv.visitTypeInsn(CHECKCAST, uiTableRowInternalName);
+
+            mv.visitVarInsn(ALOAD, 2);
+
+            mv.visitMethodInsn(
+                INVOKEVIRTUAL,
+                uiTableRowInternalName,
+                "setData",
+                "(Ljava/lang/Object;)V",
+                false
+            );
+
+            mv.visitInsn(RETURN);
+
+            mv.visitMaxs(0, 0);
+            mv.visitEnd();
+        }
+
+        // public Object uiTableGetSelected(UITable table) {
+        //     return table.getSelected();
+        // }
+        {
+            MethodVisitor mv = cw.visitMethod(
+                ACC_PUBLIC,
+                "uiTableGetSelected",
+                "(" + uiTableDesc + ")Ljava/lang/Object;" ,
+                null,
+                null
+            );
+            mv.visitCode();
+
+            mv.visitVarInsn(ALOAD, 1);
+
+            mv.visitMethodInsn(
+                INVOKEVIRTUAL,
+                uiTableInternalName,
+                "getSelected",
+                "()" + uiTableRowDesc,
+                false
+            );
+
+            mv.visitInsn(ARETURN);
+
+            mv.visitMaxs(0, 0);
+            mv.visitEnd();
+        }
+
+        // public void uiTableSelect(UITable table, Object row, Object inputEvent) {
+        //     table.select(row, inputEvent);
+        // }
+        {
+            MethodVisitor mv = cw.visitMethod(
+                ACC_PUBLIC,
+                "uiTableSelect",
+                "(" + uiTableDesc + "Ljava/lang/Object;Ljava/lang/Object;)V",
+                null,
+                null
+            );
+            mv.visitCode();
+
+            mv.visitVarInsn(ALOAD, 1);
+
+            mv.visitVarInsn(ALOAD, 2);
+            mv.visitTypeInsn(CHECKCAST, uiTableRowInternalName);
+            mv.visitVarInsn(ALOAD, 3);
+
+            mv.visitMethodInsn(
+                INVOKEVIRTUAL,
+                uiTableInternalName,
+                "select",
+                "(" + uiTableRowDesc + "Ljava/lang/Object;)V",
+                false
+            );
+
+            mv.visitInsn(RETURN);
+
+            mv.visitMaxs(0, 0);
+            mv.visitEnd();
+        }
+
+        // public void uiTableSelect(UITable table, Object row, Object inputEvent, boolean notifyDelegate) {
+        //     table.select(row, inputEvent, notifyDelegate);
+        // }
+        {
+            MethodVisitor mv = cw.visitMethod(
+                ACC_PUBLIC,
+                "uiTableSelect",
+                "(" + uiTableDesc + "Ljava/lang/Object;Ljava/lang/Object;Z)V",
+                null,
+                null
+            );
+            mv.visitCode();
+
+            mv.visitVarInsn(ALOAD, 1);
+
+            mv.visitVarInsn(ALOAD, 2);
+            mv.visitTypeInsn(CHECKCAST, uiTableRowInternalName);
+            mv.visitVarInsn(ALOAD, 3);
+            mv.visitVarInsn(ILOAD, 4);
+
+            mv.visitMethodInsn(
+                INVOKEVIRTUAL,
+                uiTableInternalName,
+                "select",
+                "(" + uiTableRowDesc + "Ljava/lang/Object;Z)V",
+                false
+            );
+
+            mv.visitInsn(RETURN);
+
+            mv.visitMaxs(0, 0);
+            mv.visitEnd();
+        }
+
+        // public UIPanelAPI uiTableGetList(UITable table) {
+        //     return table.getList();
+        // }
+        {
+            MethodVisitor mv = cw.visitMethod(
+                ACC_PUBLIC,
+                "uiTableGetList",
+                "(" + uiTableDesc + ")" + uiPanelAPIDesc,
+                null,
+                null
+            );
+            mv.visitCode();
+
+            mv.visitVarInsn(ALOAD, 1);
+            mv.visitMethodInsn(
+                INVOKEVIRTUAL,
+                uiTableInternalName,
+                "getList",
+                "()" + Type.getDescriptor(listPanelClass),
+                false
+            );
+
+            mv.visitInsn(ARETURN);
+
+            mv.visitMaxs(0, 0);
+            mv.visitEnd();
+        }
+
+        // public UIPanelAPI getParent(UIComponentAPI uiComponent) {
+        //     return ((uiComponentClass)uiComponent).getParent();
+        // }
+        {
+            MethodVisitor mv = cw.visitMethod(
+                ACC_PUBLIC,
+                "getParent",
+                "(" + Type.getDescriptor(UIComponentAPI.class) + ")" + uiPanelAPIDesc,
+                null,
+                null
+            );
+            mv.visitCode();
+
+            mv.visitVarInsn(ALOAD, 1);
+            mv.visitTypeInsn(CHECKCAST, uiComponentInternalName);
+
+            mv.visitMethodInsn(
+                INVOKEVIRTUAL,
+                uiComponentInternalName,
+                "getParent",
+                "()" + uiPanelDesc,
+                false
+            );
+
+            mv.visitInsn(ARETURN);
+
+            mv.visitMaxs(0, 0);
+            mv.visitEnd();
+        }
+
+        // public UIComponentAPI getContents(Object tooltip) {
+        //     return tooltip.getContents();
+        // }
+        {   
+            String returnDesc = Type.getDescriptor(Refl.getReturnType(Refl.getMethod("getContents", StandardTooltipV2.class)));
+            String standardTooltipV2InternalName = Type.getInternalName(StandardTooltipV2.class);
+            MethodVisitor mv = cw.visitMethod(
+                ACC_PUBLIC,
+                "getContents",
+                "(Ljava/lang/Object;)" + uiPanelAPIDesc,
+                null,
+                null
+            );
+            mv.visitCode();
+
+            mv.visitVarInsn(ALOAD, 1);
+            mv.visitTypeInsn(CHECKCAST, standardTooltipV2InternalName);
+            mv.visitMethodInsn(
+                INVOKEVIRTUAL,
+                standardTooltipV2InternalName,
+                "getContents",
+                "()" + returnDesc,
+                false
+            );
             mv.visitInsn(ARETURN);
 
             mv.visitMaxs(0, 0);
@@ -1149,7 +1744,8 @@ public class UiUtil implements Opcodes {
             messageDisplayClass,
             intelTabPlanetsPanelClass,
             mapTabClass,
-            campaignStateDialogTypeEnumClass
+            campaignStateDialogTypeEnumClass,
+            uiTableRowSubClass
         };
     }
 
@@ -1171,6 +1767,9 @@ public class UiUtil implements Opcodes {
     // public static final VarHandle isOnAbilityBarHandle;
     public static final VarHandle abilityPanelPrevButtonHandle;
     public static final VarHandle abilityPanelNextButtonHandle;
+
+    public static final VarHandle uiTableRowParamsHandle;
+    public static final VarHandle uiTableRowCreatedHandle;
 
     private static final CallSite actionListenerCallSite;
 
@@ -1196,23 +1795,23 @@ public class UiUtil implements Opcodes {
             //     }
             // }
             // isOnAbilityBarHandle = handle;
-            
+            int i = 0;
             Class<?>[] result = implementUtilInterface(coreClass, abilityPanelClass, actionListenerInterface);
-            utils = (UtilInterface) Refl.instantiateClass(result[0].getConstructors()[0]);
+            utils = (UtilInterface) Refl.instantiateClass(result[i++].getConstructors()[0]);
 
-            mapClass = result[1];
-            uiPanelClass = result[2];
-            uiComponentClass = result[3];
+            mapClass = result[i++];
+            uiPanelClass = result[i++];
+            uiComponentClass = result[i++];
 
-            Class<?> messageDisplayClass = result[4];
+            Class<?> messageDisplayClass = result[i++];
             messageDisplayListVarHandle = MethodHandles.privateLookupIn(messageDisplayClass, lookup).findVarHandle(
                 messageDisplayClass,
                 Refl.getFieldName(Refl.getFieldByType(LinkedList.class, messageDisplayClass)),
                 LinkedList.class
             );
 
-            Class<?> intelTabPlanetsPanelClass = result[5];
-            Class<?> mapTabClass = result[6];
+            Class<?> intelTabPlanetsPanelClass = result[i++];
+            Class<?> mapTabClass = result[i++];
             intelTabPlanetsPanelMapHandle = MethodHandles.privateLookupIn(intelTabPlanetsPanelClass, lookup).findVarHandle(
                 intelTabPlanetsPanelClass,
                 Refl.getFieldName(Refl.getFieldByType(mapTabClass, intelTabPlanetsPanelClass)),
@@ -1220,7 +1819,7 @@ public class UiUtil implements Opcodes {
             );
 
             Object targetEnum = null;
-            for (Object e : result[7].getEnumConstants()) {
+            for (Object e : result[i++].getEnumConstants()) {
                 if (String.valueOf(e).equals("MENU")) {
                     targetEnum = e;
                     break;
@@ -1256,6 +1855,25 @@ public class UiUtil implements Opcodes {
                 AbilitySlots.class,
                 "slots",
                 AbilitySlot[][].class
+            );
+
+            VarHandle handle = null;
+            Class<?> uiTableRowClass = result[i++];
+            for (Object field : uiTableRowClass.getDeclaredFields()) {;
+                if (Refl.getFieldType(field) == Object[].class) {
+                    handle = MethodHandles.privateLookupIn(uiTableRowClass, lookup).findVarHandle(
+                        uiTableRowClass,
+                        Refl.getFieldName(field),
+                        Object[].class
+                    );
+                    break;
+                }
+            }
+            uiTableRowParamsHandle = handle;
+            uiTableRowCreatedHandle = MethodHandles.privateLookupIn(uiTableRowClass.getSuperclass(), lookup).findVarHandle(
+                uiTableRowClass.getSuperclass(),
+                "created",
+                boolean.class
             );
 
             String[] buttonFieldNames = getPrevNextButtonFieldNames(abilityPanelClass);
@@ -1299,7 +1917,7 @@ public class UiUtil implements Opcodes {
                 actualSamMethodType
             );
 
-            CampaignEntityPickerInstantiator.init();
+            ConfirmDialogInstantiator.init();
 
         } catch (Throwable e) {
             throw new RuntimeException(e);
@@ -1408,6 +2026,12 @@ public class UiUtil implements Opcodes {
                 runAfter.run();
             }
         }.getProxy());
+    }
+
+    public static void setRowColorAndText(Object row, Object[] colorAndText) {
+        uiTableRowParamsHandle.set(row, colorAndText);
+        uiTableRowCreatedHandle.set(row, false);
+        utils.uiTableRowRender(row, 0f);
     }
 
     public static abstract class ActionListener {
