@@ -66,11 +66,11 @@ public class EntityTooltips {
                         return (StarSystem) system;
                     }
                 });
-                ((StandardTooltipV2Expandable)preTt).createImpl(true);
+                preTt.createImpl(true);
                 ((StarSystem)system).setStar(null);
 
             } else {
-                ((StandardTooltipV2Expandable)preTt).createImpl(true);
+                preTt.createImpl(true);
             }
 
             this.width = preTt.getWidthSoFar();
