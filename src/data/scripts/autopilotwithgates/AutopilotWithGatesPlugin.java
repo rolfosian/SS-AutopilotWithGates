@@ -139,6 +139,12 @@ public class AutopilotWithGatesPlugin extends BaseModPlugin {
                         Global.getSector().getCharacterData().addAbility("AutoPilotWithGates");
                         Global.getSector().getPlayerFleet().addAbility("AutoPilotWithGates");
 
+                        boolean abilityActive = (boolean) Global.getSector().getPersistentData().computeIfAbsent("$autopilotWithGatesAbility", k-> false);
+
+                        listener = aotdEnabled ? new AutoPilotListenerWithBifrosts(abilityActive) : new AutoPilotListener(abilityActive);
+                        Global.getSector().addTransientScript(listener);
+                        Global.getSector().addTransientListener(listener);
+
                         listener.setAbility((AutoPilotGatesAbility) Global.getSector().getPlayerFleet().getAbility("AutoPilotWithGates"));
 
                         registerGateIterator();
