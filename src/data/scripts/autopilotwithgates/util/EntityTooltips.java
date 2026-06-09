@@ -93,7 +93,7 @@ public class EntityTooltips {
         @Override
         public void createTooltip(TooltipMakerAPI tooltip, boolean expanded, Object var3) {
             tooltip.addCustom(this.tt, 0f);
-            this.tt.getPosition().setXAlignOffset(-5f);
+            this.tt.getPosition().setXAlignOffset(0f);
             tooltip.setHeightSoFar(this.height);
         }
     }

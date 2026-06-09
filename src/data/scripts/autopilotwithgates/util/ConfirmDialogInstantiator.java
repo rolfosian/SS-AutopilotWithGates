@@ -211,13 +211,15 @@ public class ConfirmDialogInstantiator {
         float width,
         float height,
         DialogDismissedListener dialogDismissedListener,
+        int confirmButtonIndex,
+        int cancelButtonIndex,
         String... buttonTexts
     ) {
         Object[] dialogComponents = createConfirmDialog(dialogParent, title, width, height, dialogDismissedListener, buttonTexts);
         ButtonAPI[] btns = (ButtonAPI[]) dialogComponents[2];
 
-        ButtonAPI confirmButton = btns.length == 1 ? btns[0] : btns[0]; // eugh
-        ButtonAPI cancelButton = btns.length == 1 ? btns[0] : btns[1];
+        ButtonAPI confirmButton = btns[confirmButtonIndex];
+        ButtonAPI cancelButton = btns[cancelButtonIndex];
 
         UIPanelAPI confirmDialog = (UIPanelAPI) dialogComponents[0];
         LabelAPI label = utils.confirmDialogGetLabel(confirmDialog);

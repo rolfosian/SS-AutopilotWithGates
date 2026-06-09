@@ -27,6 +27,7 @@ import com.fs.starfarer.api.impl.campaign.GateEntityPlugin;
 import com.fs.starfarer.api.impl.campaign.abilities.BaseToggleAbility;
 import com.fs.starfarer.api.impl.campaign.ids.Tags;
 import com.fs.starfarer.api.impl.campaign.intel.BaseIntelPlugin;
+import com.fs.starfarer.api.impl.campaign.procgen.StarSystemGenerator.StarSystemType;
 import com.fs.starfarer.api.input.InputEventAPI;
 import com.fs.starfarer.api.ui.Alignment;
 import com.fs.starfarer.api.ui.ButtonAPI;
@@ -109,21 +110,21 @@ public class AutoPilotGatesAbility extends BaseToggleAbility {
         isShowingEntityPicker = bool;
     }
 
-    private void showBlacklistDialog(boolean add) {
+    private void showBlacklistDialog(boolean isAdding) {
         CampaignUIAPI campaignUI = Global.getSector().getCampaignUI();
         if (utils.campaignUIGetDialogType(campaignUI) != null) return;
         utils.campaignUISetDialogType(campaignUI, UiUtil.DIALOG_TYPE_MENU_ENUM);
         UIPanelAPI screenPanel = utils.campaignUIGetScreenPanel(campaignUI);
 
         setUpDialog(
-            add,
+            isAdding,
             showConfirmDialog(
                 screenPanel,
                 "graphics/illustrations/dead_gate.jpg",
                 "",
                 660f,
                 100f,
-                add ? new DialogDismissedListener() {
+                isAdding ? new DialogDismissedListener() {
                     @Override
                     public void dialogDismissed(Object dialog, int button) {
                         if (button == 0 && pickedGate != null) {
@@ -158,6 +159,8 @@ public class AutoPilotGatesAbility extends BaseToggleAbility {
                         isShowingEntityPicker = false;
                     }
                 },
+                0,
+                3,
                 "Confirm",
                 "Pick from map",
                 "Hidden Systems",
@@ -170,303 +173,72 @@ public class AutoPilotGatesAbility extends BaseToggleAbility {
         Global.getSector().setPaused(true);
     }
 
-    private void setUpDialog(boolean add, Object[] dialogComponents, UIPanelAPI screenPanel) {
+    private void setUpDialog(boolean isAdding, Object[] dialogComponents, UIPanelAPI screenPanel) {
         List<SectorEntityToken> gates = new ArrayList<>();
         LinkedHashMap<StarSystemAPI, List<SectorEntityToken>> hiddenSystemsToGates = new LinkedHashMap<>();
-        refGates(add, gates, hiddenSystemsToGates);
-
-        Runnable showMapPicker = !gates.isEmpty() ? () -> {
-            UIPanelAPI entityPickerDialog = showCampaignEntityPicker(
-                screenPanel,
-                entityPickerDialogDismissed,
-                "Choose a Gate",
-                "",
-                "Confirm",
-                Global.getSector().getPlayerFaction(),
-                gates,
-                new BlacklistCampaignEntityPickerListener(add)
-            );
-            if (listener.getEntryGate() != null) {
-                listener.getMaps().add(UiUtil.getMapFromCampaignPickerDialog(entityPickerDialog));
-            }
-            isShowingEntityPicker = true;
-        } : null;
-
-        Runnable showTablePicker = !hiddenSystemsToGates.isEmpty() ? () -> {
-            showHiddenSystemsTableDialog(screenPanel, add, hiddenSystemsToGates);
-        } : null;
+        refGates(isAdding, gates, hiddenSystemsToGates);
+        hiddenSystemsToGates = sortAlphabetically(hiddenSystemsToGates);
 
         UIPanelAPI innerPanel = (UIPanelAPI) dialogComponents[1];
         blacklistDialogButtons = (ButtonAPI[]) dialogComponents[2];
         blacklistDialogButtons[0].setShortcut(Keyboard.KEY_G, false);
 
-        if (showMapPicker == null) {
-            blacklistDialogButtons[1].setEnabled(false);
-            blacklistDialogButtons[1].setClickable(false);
-        } else {
+        if (!gates.isEmpty()) {
             utils.buttonSetListener(blacklistDialogButtons[1], new ActionListener() {
                 @Override
                 public void actionPerformed(Object inputEvent, Object uiElement) {
-                    showMapPicker.run();
+                    UIPanelAPI entityPickerDialog = showCampaignEntityPicker(
+                        screenPanel,
+                        entityPickerDialogDismissed,
+                        "Choose a Gate",
+                        "",
+                        "Confirm",
+                        Global.getSector().getPlayerFaction(),
+                        gates,
+                        new BlacklistCampaignEntityPickerListener(isAdding)
+                    );
+                    if (listener.getEntryGate() != null) {
+                        listener.getMaps().add(UiUtil.getMapFromCampaignPickerDialog(entityPickerDialog));
+                    }
+                    isShowingEntityPicker = true;
                 }
             }.getProxy());
+        } else {
+            blacklistDialogButtons[1].setEnabled(false);
+            blacklistDialogButtons[1].setClickable(false);
         }
 
-        if (showTablePicker == null) {
-            blacklistDialogButtons[2].setEnabled(false);
-            blacklistDialogButtons[2].setClickable(false);
-        } else {
+        HiddenSystemsTableDialog tablePicker = !hiddenSystemsToGates.isEmpty() ?
+            new HiddenSystemsTableDialog(screenPanel, isAdding, hiddenSystemsToGates) : null;
+
+        if (tablePicker != null) {
             utils.buttonSetListener(blacklistDialogButtons[2], new ActionListener() {
                 @Override
                 public void actionPerformed(Object inputEvent, Object uiElement) {
-                    showTablePicker.run();
+                    tablePicker.show();
                 }
             }.getProxy());
+        } else {
+            blacklistDialogButtons[2].setEnabled(false);
+            blacklistDialogButtons[2].setClickable(false);
         }
 
-        blacklistLabel = Global.getSettings().createLabel(add ? "Choose a gate to add to the blacklist" : "Choose a gate to remove from the blacklist", Fonts.INSIGNIA_VERY_LARGE);
+        blacklistLabel = Global.getSettings().createLabel(isAdding ? "Choose a gate to add to the blacklist" : "Choose a gate to remove from the blacklist", Fonts.INSIGNIA_VERY_LARGE);
         blacklistLabel.setAlignment(Alignment.MID);
         blacklistLabel.setHighlight("add", "remove");
         blacklistLabel.setHighlightColors(new Color[] {Misc.getHighlightColor(), Misc.getHighlightColor()});
         innerPanel.addComponent((UIComponentAPI)blacklistLabel).inTMid(10f);
     }
 
-    private void showHiddenSystemsTableDialog(UIPanelAPI screenPanel, boolean add, Map<StarSystemAPI, List<SectorEntityToken>> hiddenSystemsToGates) {
-        final boolean[] wasPicked = new boolean[1];
-        wasPicked[0] = false;
+    private void refGates(boolean isAdding, List<SectorEntityToken> gates, LinkedHashMap<StarSystemAPI, List<SectorEntityToken>> hiddenSystemsToGates) {
+        List<SectorEntityToken> jumPpointsInHyper = Global.getSector().getHyperspace().getJumpPoints();
 
-        float dialogHeight = Math.min(35f * hiddenSystemsToGates.size() + 300f, 400f);
-
-        Object[] dialogComponents = showConfirmDialog(
-            screenPanel,
-            "graphics/illustrations/dead_gate.jpg",
-            "",
-            560f,
-            dialogHeight,
-            new DialogDismissedListener() {
-                @Override
-                public void dialogDismissed(Object dialog, int yesOrNo) {
-                    if (yesOrNo != 0 || !wasPicked[0] || pickedGate == null) {
-                        pickedGate = null;
-
-                        String text = add ? "Choose a gate to add to the blacklist" : "Choose a gate to remove from the blacklist";
-                        blacklistLabel.setText(text);
-                        blacklistLabel.autoSizeToWidth(blacklistLabel.computeTextWidth(text));
-                        blacklistLabel.setHighlight("add", "remove");
-                        blacklistLabel.setHighlightColors(new Color[] {Misc.getHighlightColor(), Misc.getHighlightColor()});
-                        return;
-                    }
-
-                    String labelString = add ? 
-                        "Blacklist " + pickedGate.getName() + " in " + pickedGate.getContainingLocation().getNameWithTypeShort() + "?"
-                        : "Remove " + pickedGate.getName() + " in " + pickedGate.getContainingLocation().getNameWithTypeShort() + " from blacklist?";
-
-
-                    blacklistLabel.setText(labelString);
-                    blacklistLabel.autoSizeToWidth(blacklistLabel.computeTextWidth(labelString));
-
-                    StarSystemAPI system = (StarSystemAPI) pickedGate.getContainingLocation();
-                    PlanetAPI star = system.getStar();
-                    
-                    blacklistLabel.setHighlightColor(star != null ? star.getSpec().getIconColor() : system.getLightColor());
-                    blacklistLabel.setHighlight(pickedGate.getContainingLocation().getNameWithTypeShort());
-                }
-                
-            },
-            "Confirm"
-        );
-        UIPanelAPI innerPanel = (UIPanelAPI) dialogComponents[1];
-        ((ButtonAPI[]) dialogComponents[2])[0].setShortcut(Keyboard.KEY_G, false);
-
-        float width = innerPanel.getPosition().getWidth() / 2, height = innerPanel.getPosition().getHeight() - 10f;
-
-        Color c1 = Global.getSettings().getBasePlayerColor();
-        Color c2 = Global.getSettings().getDarkPlayerColor();
-
-        Map<LocationAPI, CustomPanelAPI> systemsToTablePanels = new HashMap<>();
-        Map<LocationAPI, UITable> systemsToTables = new HashMap<>();
-
-        float gatesTableWidth = width - 10f;
-        float gatesTableHeight = height - 45f;
-
-        for (Map.Entry<StarSystemAPI, List<SectorEntityToken>> entry : hiddenSystemsToGates.entrySet()) {
-            CustomPanelAPI panel = Global.getSettings().createCustom(gatesTableWidth + 5f, gatesTableHeight, null);
-            TooltipMakerAPI tt = panel.createUIElement(gatesTableWidth + 5f, gatesTableHeight, true);
-            UITable table = (UITable) tt.beginTable(
-                c1,
-                c2,
-                Misc.getHighlightedOptionColor(),
-                30f,
-                true,
-                false, 
-                new Object[]{"Gates", gatesTableWidth}
-            );
-            systemsToTables.put(entry.getKey(), table);
-
-            for (SectorEntityToken gate : sortAlphabetically(entry.getValue())) {
-                Object row = tt.addRowWithGlow(
-                    c1,
-                    gate.getName()
-                );
-                utils.uiTableRowSetData(row, table);
-
-                String rowName = gate.getName();
-
-                ButtonAPI rowButton = utils.uiTableRowGetButton(row);
-                Object oldListener = utils.buttonGetListener(rowButton);
-
-                utils.buttonSetListener(rowButton, new ActionListener() {
-                    @Override
-                    public void actionPerformed(Object arg0, Object arg1) {
-                        Object selected = utils.uiTableGetSelected(table);
-                        if (selected != null && selected != row) {
-                            UiUtil.setRowColorAndText(selected, new Object[] {c1, ((Object[])UiUtil.uiTableRowParamsHandle.get(selected))[1]});
-                            utils.uiTableSelect((UITable)utils.uiTableRowGetData(selected), null, null); 
-                        }
-
-                        UiUtil.setRowColorAndText(row, new Object[] {TEXT_HIGHLIGHT_COLOR, rowName});
-                        utils.uiTableSelect(table, row, null);
-                        utils.actionPerformed(oldListener, arg0, arg1);
-                        pickedGate = gate;
-                        wasPicked[0] = true;
-                    }
-                }.getProxy());
-                tt.addTooltipToAddedRow(new EntityRowTooltipCreator(gate), TooltipLocation.RIGHT);
-            }
-            tt.addTable("", 0, 0f);
-            ((UIPanelAPI)table).getPosition().setXAlignOffset(0f).setYAlignOffset(-5f);
-            table.setItemsSelectable(true);
-            
-            panel.addUIElement(tt).inTL(0f,0f);
-            systemsToTablePanels.put(entry.getKey(), panel);
-        }
-
-        UITable[] table = new UITable[1];
-        float systemsTableWidth = width - 5f;
-        CustomPanelAPI panel = Global.getSettings().createCustom(systemsTableWidth + 5f, height, new BaseCustomUIPanelPlugin() {
-            @Override
-            public void processInput(List<InputEventAPI> events) {
-                for (InputEventAPI event : events) {
-                    if (event.isKeyDownEvent() && event.getEventValue() == Keyboard.KEY_ESCAPE) {
-                        Object selected = utils.uiTableGetSelected(table[0]);
-                        if (selected != null) {
-                            UITable selectedGatesTable = systemsToTables.get(utils.uiTableRowGetData(selected));
-                            if (selectedGatesTable != null) {
-                                Object selectedGate = utils.uiTableGetSelected(selectedGatesTable);
-                                if (selectedGate != null) {
-                                    UiUtil.setRowColorAndText(selectedGate, new Object[] {c1, ((Object[])UiUtil.uiTableRowParamsHandle.get(selectedGate))[1]});
-                                    utils.uiTableSelect(selectedGatesTable, null, null);
-                                    selectedGatesTable.advance(1f);
-                                    selectedGatesTable.render(0f);
-                                }
-                            }
-                            utils.uiTableSelect(table[0], null, null);
-                            List<UIComponentAPI> children = utils.getChildrenNonCopy(innerPanel);
-                            innerPanel.removeComponent(children.get(children.size()-1));
-                            
-                            wasPicked[0] = false;
-                            pickedGate = null;
-
-                            event.consume();
-                            break;
-                        }
-                    }
-                }
-            }
-        });
-        TooltipMakerAPI tt = panel.createUIElement(systemsTableWidth + 5f, height, true);
-        table[0] = (UITable) tt.beginTable(
-            c1,
-            c2,
-            Misc.getHighlightedOptionColor(),
-            30f,
-            true,
-            false, 
-            new Object[]{"Systems", systemsTableWidth}
-        );
-
-        List<Object> rows = new ArrayList<>();
-        for (StarSystemAPI system : hiddenSystemsToGates.keySet()) {
-            String rowName = system.getNameWithTypeShort();
-            Object row = tt.addRowWithGlow(
-                c1,
-                rowName
-            );
-            utils.uiTableRowSetData(row, system);
-            tt.addTooltipToAddedRow(new SystemRowTooltipCreator(system), TooltipLocation.RIGHT);
-            rows.add(row);
-
-            ButtonAPI rowButton = utils.uiTableRowGetButton(row);
-            Object oldListener = utils.buttonGetListener(rowButton);
-
-            utils.buttonSetListener(rowButton, new ActionListener() {
-                @Override
-                public void actionPerformed(Object inputEvent, Object uiElement) {
-                    Object selected = utils.uiTableGetSelected(table[0]);
-                    if (selected != null && row == selected) {
-                        utils.actionPerformed(oldListener, inputEvent, uiElement);
-                        return;
-                    }
-
-                    List<UIComponentAPI> children = utils.getChildrenNonCopy(innerPanel);
-                    for (CustomPanelAPI panel : systemsToTablePanels.values()) { // this sucks i hate it
-                        if (children.contains(panel)) {
-                            innerPanel.removeComponent(panel);
-                            break;
-                        }
-                    }
-
-                    utils.uiTableSelect(table[0], row, null);
-                    utils.actionPerformed(oldListener, inputEvent, uiElement);
-                    wasPicked[0] = false;
-                    pickedGate = null;
-
-                    innerPanel.addComponent(systemsToTablePanels.get(system)).inTL(width + 4f, 5f);
-                }
-            }.getProxy());
-        }
-        
-        Global.getSector().addTransientScript(new BaseEveryFrameScript(true) {
-            IntervalUtil interval = new IntervalUtil(0.2f, 0.2f);
-            boolean b = false;
-            @Override
-            public void advance(float arg0) {
-                interval.advance(arg0);
-                
-                if (!b) {
-                    for (Object row : rows) {
-                        StarSystemAPI system = (StarSystemAPI) utils.uiTableRowGetData(row);
-                        UiUtil.setRowColorAndText(row, new Object[] {system.getStar() != null ? system.getStar().getSpec().getIconColor() :  system.getLightColor(), system.getNameWithTypeShort()});
-                    }
-                    b = true;
-                }
-
-                if (interval.intervalElapsed()) {
-                    String text = add ? "Choose a gate to add to the blacklist" : "Choose a gate to remove from the blacklist";
-                    blacklistLabel.setText(text);
-                    blacklistLabel.autoSizeToWidth(blacklistLabel.computeTextWidth(text));
-                    blacklistLabel.setHighlight("add", "remove");
-                    blacklistLabel.setHighlightColors(new Color[] {Misc.getHighlightColor(), Misc.getHighlightColor()});
-                    Global.getSector().removeTransientScript(this);
-                }
-            }
-        });
-
-        tt.addTable("", 0, 0f);
-        ((UIPanelAPI)table[0]).getPosition().setXAlignOffset(0f).setYAlignOffset(-5f);
-        // ((UIPanelAPI)table).getPosition().setYAlignOffset(-5f);
-        table[0].setItemsSelectable(true);
-        panel.addUIElement(tt).inTL(0f,0f);
-        innerPanel.addComponent(panel).inTL(5f, 5f);
-    }
-
-    private void refGates(boolean add, List<SectorEntityToken> gates, LinkedHashMap<StarSystemAPI, List<SectorEntityToken>> hiddenSystemsToGates) {
-        if (!add) {
+        if (!isAdding) {
             for (String id : listener.getBlacklist()) {
                 SectorEntityToken entity = Global.getSector().getEntityById(id);
                 StarSystemAPI system = (StarSystemAPI) entity.getContainingLocation();
 
-                if (!isShowOnHyperspaceMap(system)) hiddenSystemsToGates.computeIfAbsent(system, sys -> new ArrayList<>()).add(entity);
+                if (!isShowOnHyperspaceMap(system, jumPpointsInHyper)) hiddenSystemsToGates.computeIfAbsent(system, sys -> new ArrayList<>()).add(entity);
                 else gates.add(entity);
             }
         } else {
@@ -483,7 +255,7 @@ public class AutoPilotGatesAbility extends BaseToggleAbility {
                 }
 
                 if (foundGates.size() > 0) {
-                    if (!isShowOnHyperspaceMap(system)) hiddenSystemsToGates.put(system, foundGates);
+                    if (!isShowOnHyperspaceMap(system,jumPpointsInHyper)) hiddenSystemsToGates.put(system, foundGates);
                     else gates.addAll(foundGates);
                 }
             }
@@ -566,11 +338,11 @@ public class AutoPilotGatesAbility extends BaseToggleAbility {
     }
 
     private class BlacklistCampaignEntityPickerListener extends BaseCampaignEntityPickerListener {
-        private final boolean add;
+        private final boolean isAdding;
 
-        public BlacklistCampaignEntityPickerListener(boolean add) {
+        public BlacklistCampaignEntityPickerListener(boolean isAdding) {
             super();
-            this.add = add;
+            this.isAdding = isAdding;
 
             Global.getSector().addTransientScript(new BaseEveryFrameScript(true) {
                 IntervalUtil interval = new IntervalUtil(0.2f, 0.2f);
@@ -579,7 +351,7 @@ public class AutoPilotGatesAbility extends BaseToggleAbility {
                     interval.advance(arg0);
 
                     if (interval.intervalElapsed()) {
-                        String text = add ? "Choose a gate to add to the blacklist" : "Choose a gate to remove from the blacklist";
+                        String text = isAdding ? "Choose a gate to add to the blacklist" : "Choose a gate to remove from the blacklist";
                         blacklistLabel.setText(text);
                         blacklistLabel.autoSizeToWidth(blacklistLabel.computeTextWidth(text));
                         blacklistLabel.setHighlight("add", "remove");
@@ -594,7 +366,7 @@ public class AutoPilotGatesAbility extends BaseToggleAbility {
         public void pickedEntity(SectorEntityToken entity) {
             pickedGate = entity;
 
-            String labelString = this.add ? 
+            String labelString = this.isAdding ? 
                 "Blacklist " + entity.getName() + " in " + entity.getContainingLocation().getNameWithTypeShort() + "?"
                 : "Remove " + entity.getName() + " in " + entity.getContainingLocation().getNameWithTypeShort() + " from blacklist?";
 
@@ -615,7 +387,7 @@ public class AutoPilotGatesAbility extends BaseToggleAbility {
         public void cancelledEntityPicking() {
             isShowingEntityPicker = false;
 
-            String text = add ? "Choose a gate to add to the blacklist" : "Choose a gate to remove from the blacklist";
+            String text = this.isAdding ? "Choose a gate to add to the blacklist" : "Choose a gate to remove from the blacklist";
             blacklistLabel.setText(text);
             blacklistLabel.autoSizeToWidth(blacklistLabel.computeTextWidth(text));
             blacklistLabel.setHighlight("add", "remove");
@@ -635,19 +407,305 @@ public class AutoPilotGatesAbility extends BaseToggleAbility {
         }
 
         public String getSelectedTextOverrideFor(SectorEntityToken entity) {
-            return this.add ?
+            return this.isAdding ?
                 "Add " + entity.getName() + " in " + entity.getContainingLocation().getNameWithTypeShort() + " to Autopilot's Blacklist?"
                 : "Remove " + entity.getName() + " in " + entity.getContainingLocation().getNameWithTypeShort() + " from Autopilot's Blacklist?";
         }
     }
 
+    private class HiddenSystemsTableDialog {
+        private final UIPanelAPI screenPanel;
+        private final boolean isAdding;
+        private final Map<StarSystemAPI, List<SectorEntityToken>> systemsToGates;
+
+        private boolean wasPicked = false;
+        private float panelWidth;
+        private float panelHeight;
+
+        private UIPanelAPI innerPanel;
+        private UITable systemsTable;
+        private CustomPanelAPI currSelected;
+
+        private final Map<LocationAPI, CustomPanelAPI> systemsToTablePanels = new HashMap<>();
+        private final Map<LocationAPI, UITable> systemsToTables = new HashMap<>();
+        private final List<Object> systemRows = new ArrayList<>();
+
+        public HiddenSystemsTableDialog(UIPanelAPI screenPanel, boolean isAdding, Map<StarSystemAPI, List<SectorEntityToken>> systemsToGates) {
+            this.screenPanel = screenPanel;
+            this.isAdding = isAdding;
+            this.systemsToGates = systemsToGates;
+        }
+
+        public void show() {
+            float dialogHeight = Math.min(35f * systemsToGates.size() + 300f, 400f);
+
+            Object[] dialogComponents = showConfirmDialog(
+                screenPanel,
+                "graphics/illustrations/dead_gate.jpg",
+                "",
+                560f,
+                dialogHeight,
+                createDialogDismissedListener(),
+                0,
+                0,
+                "Confirm"
+            );
+
+            this.innerPanel = (UIPanelAPI) dialogComponents[1];
+            ((ButtonAPI[]) dialogComponents[2])[0].setShortcut(Keyboard.KEY_G, false);
+
+            this.panelWidth = this.innerPanel.getPosition().getWidth() / 2f;
+            this.panelHeight = this.innerPanel.getPosition().getHeight() - 10f;
+
+            buildGatesTables();
+            buildSystemsTable();
+            addFormattingScript();
+        }
+
+        private DialogDismissedListener createDialogDismissedListener() {
+            return new DialogDismissedListener() {
+                @Override
+                public void dialogDismissed(Object dialog, int yesOrNo) {
+                    if (yesOrNo != 0 || !wasPicked || pickedGate == null) {
+                        pickedGate = null;
+                        resetBlacklistLabel();
+                        return;
+                    }
+                    applyGateSelection();
+                }
+            };
+        }
+
+        private void resetBlacklistLabel() {
+            String text = isAdding ? "Choose a gate to add to the blacklist" : "Choose a gate to remove from the blacklist";
+            blacklistLabel.setText(text);
+            blacklistLabel.autoSizeToWidth(blacklistLabel.computeTextWidth(text));
+            blacklistLabel.setHighlight("add", "remove");
+            blacklistLabel.setHighlightColors(new Color[] {Misc.getHighlightColor(), Misc.getHighlightColor()});
+        }
+
+        private void applyGateSelection() {
+            LocationAPI location = pickedGate.getContainingLocation();
+            String locationName = location.getNameWithTypeShort();
+            
+            String labelString = isAdding 
+                ? "Blacklist " + pickedGate.getName() + " in " + locationName + "?"
+                : "Remove " + pickedGate.getName() + " in " + locationName + " from blacklist?";
+
+            blacklistLabel.setText(labelString);
+            blacklistLabel.autoSizeToWidth(blacklistLabel.computeTextWidth(labelString));
+
+            StarSystemAPI system = (StarSystemAPI) location;
+            PlanetAPI star = system.getStar();
+            
+            Color highlightColor = star != null ? star.getSpec().getIconColor() : system.getLightColor();
+            blacklistLabel.setHighlightColor(highlightColor);
+            blacklistLabel.setHighlight(locationName);
+        }
+
+        private void buildGatesTables() {
+            Color baseColor = Global.getSettings().getBasePlayerColor();
+            Color darkColor = Global.getSettings().getDarkPlayerColor();
+
+            float gatesTableWidth = panelWidth - 10f;
+            float gatesTableHeight = panelHeight - 45f;
+
+            for (Map.Entry<StarSystemAPI, List<SectorEntityToken>> entry : systemsToGates.entrySet()) {
+                List<SectorEntityToken> gates = entry.getValue();
+                sortAlphabetically(gates);
+
+                CustomPanelAPI panel = Global.getSettings().createCustom(gatesTableWidth + 5f, gatesTableHeight, null);
+                TooltipMakerAPI tooltip = panel.createUIElement(gatesTableWidth + 5f, gatesTableHeight, true);
+                
+                UITable table = (UITable) tooltip.beginTable(
+                    baseColor, darkColor, Misc.getHighlightedOptionColor(),
+                    30f, true, false, 
+                    new Object[]{"Gates", gatesTableWidth}
+                );
+                systemsToTables.put(entry.getKey(), table);
+
+                for (SectorEntityToken gate : gates) {
+                    createGateRow(tooltip, table, gate, baseColor);
+                }
+
+                tooltip.addTable("", 0, 0f);
+                ((UIPanelAPI) table).getPosition().setXAlignOffset(0f).setYAlignOffset(-5f);
+                table.setItemsSelectable(true);
+                
+                panel.addUIElement(tooltip).inTL(0f, 0f);
+                systemsToTablePanels.put(entry.getKey(), panel);
+            }
+        }
+
+        private void createGateRow(TooltipMakerAPI tooltip, UITable table, SectorEntityToken gate, Color baseColor) {
+            String gateName = gate.getName();
+            Object row = tooltip.addRowWithGlow(baseColor, gateName);
+            utils.uiTableRowSetData(row, table);
+
+            ButtonAPI rowButton = utils.uiTableRowGetButton(row);
+            Object oldListener = utils.buttonGetListener(rowButton);
+
+            utils.buttonSetListener(rowButton, new ActionListener() {
+                @Override
+                public void actionPerformed(Object inputEvent, Object uiElement) {
+                    Object selected = utils.uiTableGetSelected(table);
+                    if (selected != null && selected != row) {
+                        Object[] params = (Object[]) UiUtil.uiTableRowParamsHandle.get(selected);
+                        UiUtil.setRowColorAndText(selected, new Object[] {baseColor, params[1]});
+                        utils.uiTableSelect((UITable) utils.uiTableRowGetData(selected), null, null); 
+                    }
+
+                    UiUtil.setRowColorAndText(row, new Object[] {TEXT_HIGHLIGHT_COLOR, gateName});
+                    utils.uiTableSelect(table, row, null);
+                    utils.actionPerformed(oldListener, inputEvent, uiElement);
+                    
+                    pickedGate = gate;
+                    wasPicked = true;
+                }
+            }.getProxy());
+
+            tooltip.addTooltipToAddedRow(new EntityRowTooltipCreator(gate), TooltipLocation.RIGHT);
+        }
+
+        private void buildSystemsTable() {
+            Color baseColor = Global.getSettings().getBasePlayerColor();
+            Color darkColor = Global.getSettings().getDarkPlayerColor();
+            float systemsTableWidth = panelWidth - 5f;
+
+            CustomPanelAPI panel = Global.getSettings().createCustom(
+                systemsTableWidth + 5f, 
+                panelHeight, 
+                createSystemPanelPlugin(baseColor)
+            );
+
+            TooltipMakerAPI tooltip = panel.createUIElement(systemsTableWidth + 5f, panelHeight, true);
+            systemsTable = (UITable) tooltip.beginTable(
+                baseColor, darkColor, Misc.getHighlightedOptionColor(),
+                30f, true, false, 
+                new Object[]{"Systems", systemsTableWidth}
+            );
+
+            for (StarSystemAPI system : systemsToGates.keySet()) {
+                createSystemRow(tooltip, system, baseColor);
+            }
+
+            tooltip.addTable("", 0, 0f);
+            ((UIPanelAPI) systemsTable).getPosition().setXAlignOffset(0f).setYAlignOffset(-5f);
+            systemsTable.setItemsSelectable(true);
+            panel.addUIElement(tooltip).inTL(0f, 0f);
+            innerPanel.addComponent(panel).inTL(5f, 5f);
+        }
+
+        private BaseCustomUIPanelPlugin createSystemPanelPlugin(Color baseColor) {
+            return new BaseCustomUIPanelPlugin() {
+                @Override
+                public void processInput(List<InputEventAPI> events) {
+                    for (InputEventAPI event : events) {
+                        if (event.isKeyDownEvent() && event.getEventValue() == Keyboard.KEY_ESCAPE) {
+                            handleEscapePress(event, baseColor);
+                            break;
+                        }
+                    }
+                }
+            };
+        }
+
+        private void handleEscapePress(InputEventAPI event, Color baseColor) {
+            Object selected = utils.uiTableGetSelected(systemsTable);
+            if (selected == null) return;
+
+            UITable selectedGatesTable = systemsToTables.get(utils.uiTableRowGetData(selected));
+            if (selectedGatesTable != null) {
+                Object selectedGate = utils.uiTableGetSelected(selectedGatesTable);
+                if (selectedGate != null) {
+                    Object[] params = (Object[]) UiUtil.uiTableRowParamsHandle.get(selectedGate);
+                    UiUtil.setRowColorAndText(selectedGate, new Object[] {baseColor, params[1]});
+                    utils.uiTableSelect(selectedGatesTable, null, null);
+                }
+            }
+
+            utils.uiTableSelect(systemsTable, null, null);
+            List<UIComponentAPI> children = utils.getChildrenNonCopy(innerPanel);
+            innerPanel.removeComponent(children.get(children.size() - 1));
+            
+            wasPicked = false;
+            pickedGate = null;
+            event.consume();
+        }
+
+        private void createSystemRow(TooltipMakerAPI tooltip, StarSystemAPI system, Color baseColor) {
+            Object row = tooltip.addRowWithGlow(baseColor, system.getNameWithTypeShort());
+            utils.uiTableRowSetData(row, system);
+            tooltip.addTooltipToAddedRow(new SystemRowTooltipCreator(system), TooltipLocation.RIGHT);
+            systemRows.add(row);
+
+            ButtonAPI rowButton = utils.uiTableRowGetButton(row);
+            Object oldListener = utils.buttonGetListener(rowButton);
+
+            utils.buttonSetListener(rowButton, new ActionListener() {
+                @Override
+                public void actionPerformed(Object inputEvent, Object uiElement) {
+                    Object selected = utils.uiTableGetSelected(systemsTable);
+                    if (selected != null) {
+                        if (row == selected) {
+                            utils.actionPerformed(oldListener, inputEvent, uiElement);
+                            return;
+                        }
+
+                    }
+
+                    if (currSelected != null) innerPanel.removeComponent(currSelected);
+                    currSelected = systemsToTablePanels.get(system);
+
+                    utils.uiTableSelect(systemsTable, row, null);
+                    utils.actionPerformed(oldListener, inputEvent, uiElement);
+                    wasPicked = false;
+                    pickedGate = null;
+
+                    innerPanel.addComponent(currSelected).inTL(panelWidth + 4f, 5f);
+                }
+            }.getProxy());
+        }
+
+        private void addFormattingScript() {
+            Global.getSector().addTransientScript(new BaseEveryFrameScript(true) {
+                private final IntervalUtil interval = new IntervalUtil(0.2f, 0.2f);
+                private boolean isInitialized = false;
+
+                @Override
+                public void advance(float amount) {
+                    interval.advance(amount);
+                    
+                    if (!isInitialized) {
+                        initializeRowColors();
+                        isInitialized = true;
+                    }
+
+                    if (interval.intervalElapsed()) {
+                        resetBlacklistLabel();
+                        Global.getSector().removeTransientScript(this);
+                    }
+                }
+
+                private void initializeRowColors() {
+                    for (Object row : systemRows) {
+                        StarSystemAPI system = (StarSystemAPI) utils.uiTableRowGetData(row);
+                        PlanetAPI star = system.getStar();
+                        Color color = star != null ? star.getSpec().getIconColor() : system.getLightColor();
+                        UiUtil.setRowColorAndText(row, new Object[] {color, system.getNameWithTypeShort()});
+                    }
+                }
+            });
+        }
+    }
+
     private class BlacklistMessagePlugin extends BaseIntelPlugin {
-        private final boolean add;
+        private final boolean isAdding;
         private String gateName;
         private String locName;
 
-        public BlacklistMessagePlugin(boolean add, SectorEntityToken pickedGate) {
-            this.add = add;
+        public BlacklistMessagePlugin(boolean isAdding, SectorEntityToken pickedGate) {
+            this.isAdding = isAdding;
             this.gateName = pickedGate.getName();
             this.locName = pickedGate.getContainingLocation().getNameWithTypeShort();
         }
@@ -664,13 +722,15 @@ public class AutoPilotGatesAbility extends BaseToggleAbility {
         public void createIntelInfo(TooltipMakerAPI info, IntelInfoPlugin.ListInfoMode mode) {
             info.setParaFontColor(Misc.getBrightPlayerColor());
 
-            if (add) info.addPara(gateName + " in " + locName + " added to the autopilot's gate blacklist.", 0f);
+            if (this.isAdding) info.addPara(gateName + " in " + locName + " added to the autopilot's gate blacklist.", 0f);
             else info.addPara(gateName + " in " + locName + " removed from the autopilot's gate blacklist.", 0f);
         }
     }
 
-    public static boolean isShowOnHyperspaceMap(StarSystemAPI system) {
-        for (SectorEntityToken e : Global.getSector().getHyperspace().getJumpPoints()) {
+    public static boolean isShowOnHyperspaceMap(StarSystemAPI system, List<SectorEntityToken> jumpPointsInHyper) {
+        if (system.getType() == StarSystemType.DEEP_SPACE) return false;
+
+        for (SectorEntityToken e : jumpPointsInHyper) {
             JumpPointAPI jp = (JumpPointAPI) e;
 
             if (jp.getDestinationStarSystem() == system) {
@@ -700,12 +760,14 @@ public class AutoPilotGatesAbility extends BaseToggleAbility {
         ));
     }
 
-    public static List<SectorEntityToken> sortAlphabetically(List<SectorEntityToken> entities) {
-        return entities.size() <= 1 ? entities : entities.stream()
-            .sorted(Comparator.comparing(
+    public static void sortAlphabetically(List<SectorEntityToken> entities) {
+        if (entities.size() <= 1) return;
+
+        entities.sort(
+            Comparator.comparing(
                 SectorEntityToken::getName,
                 Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)
-            ))
-            .toList();
+            )
+        );
     }
 }
