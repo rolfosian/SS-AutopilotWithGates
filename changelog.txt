@@ -58,3 +58,8 @@ Version 0.1.3
 Version 0.1.3a
 
 - Fixed crash on game save when ability isnt unlocked
+
+Version 0.1.4
+
+- Reworked gate blacklist dialog. Gates in systems not shown on the hyperspace map can now be picked via a different sub-dialog
+- Fixed regression crash on At the gates quest completion
