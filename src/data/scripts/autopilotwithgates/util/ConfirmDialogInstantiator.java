@@ -201,9 +201,6 @@ public class ConfirmDialogInstantiator {
         }
     }
 
-    /**
-     * Assumes confirm button is index 0 of buttonTexts close button is index 1 of buttonTexts, or index 0 if one text is passed
-     */
     public static Object[] showConfirmDialog(
         UIPanelAPI dialogParent,
         String backgroundImage,
