@@ -61,6 +61,7 @@ public class UiUtil implements Opcodes {
         public UIPanelAPI campaignUIGetScreenPanel(Object campaignUI);
         public Object campaignUIGetDialogType(Object campaignUI);
         public void campaignUISetDialogType(Object campaignUI, Object dialogTypeEnum);
+
         public UIPanelAPI confirmDialogGetInnerPanel(Object confirmDialog);
         public LabelAPI confirmDialogGetLabel(Object confirmDialog);
 
@@ -114,6 +115,7 @@ public class UiUtil implements Opcodes {
         public UIPanelAPI getContents(Object tooltip);
         public UIPanelAPI getParent(UIComponentAPI component);
 
+        public void uiPanelFakeAdvance(UIPanelAPI uiPanel, float amount);
         public List<UIComponentAPI> getChildrenNonCopy(UIPanelAPI uiPanel);
         public List<UIComponentAPI> getChildrenNonCopy(UIComponentAPI parent); // custom method with instanceof check uiPanelClass else return null
 
@@ -1701,7 +1703,7 @@ public class UiUtil implements Opcodes {
             mv.visitEnd();
         }
 
-        // public List<UIComponentAPI> getChildrenNonCopy(Object uiPanel) {
+        // public List<UIComponentAPI> getChildrenNonCopy(UIPanelAPI uiPanel) {
         //     return ((uiPanelClass)uiPanel).getChildrenNonCopy();
         // }
         {
@@ -1726,6 +1728,37 @@ public class UiUtil implements Opcodes {
             );
 
             mv.visitInsn(ARETURN);
+
+            mv.visitMaxs(0, 0);
+            mv.visitEnd();
+        }
+
+        // public void uiPanelFakeAdvance(UIPanelAPI uiPanel, float amount) {
+        //     return ((uiPanelClass)uiPanel).fakeAdvance(amount);
+        // }
+        {
+            MethodVisitor mv = cw.visitMethod(
+                ACC_PUBLIC,
+                "uiPanelFakeAdvance",
+                "(" + uiPanelAPIDesc + "F)V",
+                null,
+                null
+            );
+            mv.visitCode();
+
+            mv.visitVarInsn(ALOAD, 1);
+            mv.visitTypeInsn(CHECKCAST, uiPanelInternalName);
+            mv.visitVarInsn(FLOAD, 2);
+
+            mv.visitMethodInsn(
+                INVOKEVIRTUAL,
+                uiPanelInternalName,
+                "fakeAdvance",
+                "(F)V",
+                false
+            );
+
+            mv.visitInsn(RETURN);
 
             mv.visitMaxs(0, 0);
             mv.visitEnd();
