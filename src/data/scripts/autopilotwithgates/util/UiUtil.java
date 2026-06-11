@@ -1,5 +1,6 @@
 package data.scripts.autopilotwithgates.util;
 
+import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.awt.Color;
@@ -12,6 +13,7 @@ import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodType;
 
 import org.apache.log4j.Logger;
+import org.lwjgl.util.vector.Vector2f;
 
 import com.fs.graphics.Sprite;
 import com.fs.graphics.util.Fader;
@@ -21,6 +23,9 @@ import com.fs.starfarer.api.campaign.CampaignUIAPI;
 import com.fs.starfarer.api.campaign.SectorEntityToken;
 import com.fs.starfarer.api.campaign.comm.IntelInfoPlugin;
 import com.fs.starfarer.api.impl.campaign.intel.BaseIntelPlugin;
+import com.fs.starfarer.api.input.InputEventAPI;
+import com.fs.starfarer.api.input.InputEventClass;
+import com.fs.starfarer.api.input.InputEventType;
 import com.fs.starfarer.api.ui.ButtonAPI;
 import com.fs.starfarer.api.ui.Fonts;
 import com.fs.starfarer.api.ui.LabelAPI;
@@ -64,6 +69,7 @@ public class UiUtil implements Opcodes {
 
         public UIPanelAPI confirmDialogGetInnerPanel(Object confirmDialog);
         public LabelAPI confirmDialogGetLabel(Object confirmDialog);
+        public void confirmDialogSetRightClickOutsideCancels(Object confirmDialog, boolean rightClickOutsideCancels);
 
         public EventsPanel getEventsPanel(Object intelTab);
         public ButtonAPI intelTabGetPlanetsButton(Object intelTab);
@@ -71,9 +77,11 @@ public class UiUtil implements Opcodes {
 
         public UIPanelAPI eventsPanelGetMap(EventsPanel eventsPanel);
         public UIPanelAPI mapTabGetMap(Object mapTab);
+        public void mapTabCenterOnEntity(Object mapTab, SectorEntityToken entity);
 
         public BaseLocation mapGetLocation(UIPanelAPI map);
         public UIPanelAPI mapGetMapTab(UIPanelAPI map);
+        public void mapAddPing(UIPanelAPI map, SectorEntityToken entity, Color color, float maxRadius, int count, float interval);
         public boolean isRadarMode(UIPanelAPI map);
         public Object getZoomTracker(UIPanelAPI map);
         public float getFactor(UIPanelAPI map);
@@ -187,6 +195,7 @@ public class UiUtil implements Opcodes {
         String baseLocationDesc = Type.getDescriptor(BaseLocation.class);
         String tooltipDesc = Type.getDescriptor(toolTipClass);
         String messageDisplayDesc = Type.getDescriptor(messageDisplayClass);
+        String colorDesc = Type.getDescriptor(Color.class);
 
         String campaignStateInternalName = Type.getInternalName(CampaignState.class);
 
@@ -459,6 +468,38 @@ public class UiUtil implements Opcodes {
             mv.visitEnd();
         }
 
+        // public void mapTabCenterOnEntity(Object mapTab, SectorEntityToken entity) {
+        //     ((mapTabClass)mapTab).centerOnEntity(entity);
+        // }
+        {
+            MethodVisitor mv = cw.visitMethod(
+                ACC_PUBLIC,
+                "mapTabCenterOnEntity",
+                "(Ljava/lang/Object;" + sectorEntityTokenDesc + ")V",
+                null,
+                null
+            );
+            mv.visitCode();
+
+            mv.visitVarInsn(ALOAD, 1);
+            mv.visitTypeInsn(CHECKCAST, mapTabInternalName);
+            mv.visitVarInsn(ALOAD, 2);
+            mv.visitTypeInsn(CHECKCAST, Type.getInternalName(SectorEntityToken.class));
+
+            mv.visitMethodInsn(
+                INVOKEVIRTUAL,
+                mapTabInternalName,
+                "centerOnEntity",
+                "(" + sectorEntityTokenDesc + ")V",
+                false
+            );
+
+            mv.visitInsn(RETURN);
+
+            mv.visitMaxs(0, 0);
+            mv.visitEnd();
+        }
+
         // public BaseLocation mapGetLocation(UIPanelAPI map) {
         //     return ((mapClass)map).getLocation();
         // }
@@ -545,6 +586,42 @@ public class UiUtil implements Opcodes {
             );
 
             mv.visitInsn(ARETURN);
+
+            mv.visitMaxs(0, 0);
+            mv.visitEnd();
+        }
+
+        // public void mapAddPing(UIPanelAPI map, SectorEntityToken entity, Color color, float maxRadius, int count, float interval) {
+        //     ((mapClass)map).addPing(entity, color, maxRadius, count, interval);
+        // }
+        {
+            MethodVisitor mv = cw.visitMethod(
+                ACC_PUBLIC,
+                "mapAddPing",
+                "(" + uiPanelAPIDesc + sectorEntityTokenDesc + colorDesc + "FIF)V",
+                null,
+                null
+            );
+            mv.visitCode();
+
+            mv.visitVarInsn(ALOAD, 1);
+            mv.visitTypeInsn(CHECKCAST, mapClassInternalName);
+
+            mv.visitVarInsn(ALOAD, 2);
+            mv.visitVarInsn(ALOAD, 3);
+            mv.visitVarInsn(FLOAD, 4);
+            mv.visitVarInsn(ILOAD, 5);
+            mv.visitVarInsn(FLOAD, 6);
+
+            mv.visitMethodInsn(
+                INVOKEVIRTUAL,
+                mapClassInternalName,
+                "addPing",
+                "(" + sectorEntityTokenDesc + colorDesc + "FIF)V",
+                false
+            );
+
+            mv.visitInsn(RETURN);
 
             mv.visitMaxs(0, 0);
             mv.visitEnd();
@@ -695,6 +772,38 @@ public class UiUtil implements Opcodes {
             );
 
             mv.visitInsn(ARETURN);
+
+            mv.visitMaxs(0, 0);
+            mv.visitEnd();
+        }
+
+        // public void confirmDialogSetRightClickOutsideCancels(Object confirmDialog, boolean rightClickOutsideCancels) {
+        //     return ((confirmDialogClass)confirmDialog).setRightClickOutsideCancels(rightClickOutsideCancels);
+        // }
+        {
+            String internalName = Type.getInternalName(CampaignEntityPickerDialog.class.getSuperclass().getSuperclass());
+            MethodVisitor mv = cw.visitMethod(
+                ACC_PUBLIC,
+                "confirmDialogSetRightClickOutsideCancels",
+                "(Ljava/lang/Object;Z)V",
+                null,
+                null
+            );
+            mv.visitCode();
+
+            mv.visitVarInsn(ALOAD, 1);
+            mv.visitTypeInsn(CHECKCAST, internalName);
+            mv.visitVarInsn(ILOAD, 2);
+
+            mv.visitMethodInsn(
+                INVOKEVIRTUAL,
+                internalName,
+                "setRightClickOutsideCancels",
+                "(Z)V",
+                false
+            );
+
+            mv.visitInsn(RETURN);
 
             mv.visitMaxs(0, 0);
             mv.visitEnd();

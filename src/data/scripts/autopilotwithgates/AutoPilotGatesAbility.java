@@ -7,7 +7,9 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import org.lwjgl.input.Keyboard;
+import org.lwjgl.util.vector.Vector2f;
 
+import com.fs.graphics.util.Fader;
 import com.fs.starfarer.api.GameState;
 import com.fs.starfarer.api.Global;
 
@@ -15,6 +17,7 @@ import com.fs.starfarer.api.campaign.BaseCampaignEntityPickerListener;
 import com.fs.starfarer.api.campaign.BaseCustomUIPanelPlugin;
 import com.fs.starfarer.api.campaign.CampaignUIAPI;
 import com.fs.starfarer.api.campaign.CustomCampaignEntityAPI;
+import com.fs.starfarer.api.campaign.CustomUIPanelPlugin;
 import com.fs.starfarer.api.campaign.JumpPointAPI;
 import com.fs.starfarer.api.campaign.PlanetAPI;
 import com.fs.starfarer.api.campaign.SectorEntityToken;
@@ -34,6 +37,7 @@ import com.fs.starfarer.api.ui.ButtonAPI;
 import com.fs.starfarer.api.ui.CustomPanelAPI;
 import com.fs.starfarer.api.ui.Fonts;
 import com.fs.starfarer.api.ui.LabelAPI;
+import com.fs.starfarer.api.ui.PositionAPI;
 import com.fs.starfarer.api.ui.ScrollPanelAPI;
 import com.fs.starfarer.api.ui.TooltipMakerAPI;
 import com.fs.starfarer.api.ui.TooltipMakerAPI.TooltipLocation;
@@ -41,6 +45,8 @@ import com.fs.starfarer.api.ui.UIComponentAPI;
 import com.fs.starfarer.api.ui.UIPanelAPI;
 import com.fs.starfarer.api.util.IntervalUtil;
 import com.fs.starfarer.api.util.Misc;
+import com.fs.starfarer.campaign.BaseCampaignEntity;
+import com.fs.starfarer.campaign.BaseLocation;
 import com.fs.starfarer.campaign.ui.UITable;
 import com.fs.starfarer.ui.impl.StandardTooltipV2Expandable;
 
@@ -414,6 +420,113 @@ public class AutoPilotGatesAbility extends BaseToggleAbility {
     }
 
     private class HiddenSystemsTableDialog {
+        private class DummyMapPingToken extends BaseCampaignEntity implements CustomUIPanelPlugin {
+            private static float pingInterval = 0.33f;
+            static {
+                refNoiseTex();
+            }
+            private final SectorEntityToken entity;
+
+            private UIComponentAPI mapController;
+            private UIPanelAPI hyperMap;
+
+            private Object noise;
+            private Object noiseRng;
+            private Fader noiseFader;
+            private Color color;
+
+            private float elapsed = 0f;
+
+            public DummyMapPingToken(StarSystemAPI system) {
+                super("apwg_DUMMY");
+
+                SectorEntityToken center = system.getCenter();
+                SectorEntityToken star = system.getStar();
+                if (center == null && star == null) {
+                    system.initNonStarCenter();
+                }
+                this.entity = system.getCenter();
+            }
+
+            @Override
+            public void advance(float amount) {
+                if (noiseFader.getBrightness() > 0f) {
+                    advanceNoiseRng(noiseRng, amount);
+                }
+                noiseFader.advance(amount);
+                setNoiseSeed(noise, Misc.random.nextLong());
+
+                this.elapsed += amount;
+                while (this.elapsed >= pingInterval) {
+                    this.elapsed -= pingInterval;
+                    utils.mapAddPing(
+                        this.hyperMap,
+                        this,
+                        this.color,
+                        50f,
+                        1,
+                        0f
+                    );
+                }
+            }
+
+            @Override
+            public void positionChanged(PositionAPI arg0) {
+                this.elapsed = 0.33f;
+                if (this.mapController != null) utils.mapTabCenterOnEntity(this.mapController, this);
+            }
+
+            public void init(CustomPanelAPI panel, UIComponentAPI mapController, UIPanelAPI hyperMap) {
+                this.mapController = mapController;
+                this.hyperMap = hyperMap;
+                this.noise = createNoiseRenderer(panel.getPosition().getWidth(), panel.getPosition().getHeight() + 20f);
+                this.noiseFader = getNoiseFader(noise);
+                this.noiseRng = getNoiseRng(noise);
+
+                if (listener.getEntryGate() != null) {
+                    listener.getMaps().add(this.hyperMap);
+                }
+
+                panel.addComponent(Global.getSettings().createCustom(0f,0f,new BaseCustomUIPanelPlugin() {
+                    @Override
+                    public void render(float arg0) {
+                        PositionAPI pos = panel.getPosition();
+                        renderNoise(noise, pos.getX(), pos.getY(), arg0);
+                    }
+                }));
+            }
+
+            public void flickerNoise() {
+                noiseFader.setDuration(0f, 0.5f);
+                noiseFader.fadeIn();
+            }
+
+            @Override
+            public boolean isStar() {
+                return false;
+            }
+
+            @Override
+            public float getRadius() {
+                return 0f;
+            }
+
+            @Override
+            public BaseLocation getContainingLocation() {
+                return (BaseLocation) Global.getSector().getHyperspace();
+            }
+
+            @Override
+            public Vector2f getLocation() {
+                return entity.getLocationInHyperspace();
+            }
+
+            public void buttonPressed(Object arg0) {}
+            public void processInput(List<InputEventAPI> arg0) {}
+            public void renderBelow(float arg0) {}
+            public void render(float arg0) {}
+        }
+
         private final UIPanelAPI screenPanel;
         private final boolean isAdding;
         private final Map<StarSystemAPI, List<SectorEntityToken>> systemsToGates;
@@ -425,15 +538,19 @@ public class AutoPilotGatesAbility extends BaseToggleAbility {
         private UIPanelAPI dialog;
         private UIPanelAPI innerPanel;
         private UITable systemsTable;
-        private CustomPanelAPI currSelected;
+
+        private CustomPanelAPI currSelectedGates = null;
+        private CustomPanelAPI currSelectedSystem = null;
 
         private Runnable reselectGate = null;
         private Runnable reselectSystem = null;
         private Runnable reselect = null;
 
-        private final Map<LocationAPI, CustomPanelAPI> systemsToTablePanels = new HashMap<>();
+        private final Map<LocationAPI, CustomPanelAPI[]> systemsToTablePanels = new HashMap<>();
         private final Map<LocationAPI, UITable> systemsToTables = new HashMap<>();
         private final List<Object> systemRows = new ArrayList<>();
+
+        private CustomPanelAPI interceptor;
 
         public HiddenSystemsTableDialog(UIPanelAPI screenPanel, boolean isAdding, Map<StarSystemAPI, List<SectorEntityToken>> systemsToGates) {
             this.screenPanel = screenPanel;
@@ -458,15 +575,54 @@ public class AutoPilotGatesAbility extends BaseToggleAbility {
 
             this.dialog = (UIPanelAPI) dialogComponents[0];
             this.innerPanel = (UIPanelAPI) dialogComponents[1];
-            ((ButtonAPI[]) dialogComponents[2])[0].setShortcut(Keyboard.KEY_G, false);
+            this.dialog.getPosition().setXAlignOffset(100f);
+
+            // utils.confirmDialogSetRightClickOutsideCancels(dialog, false);
+
+            ButtonAPI confirmButton = ((ButtonAPI[]) dialogComponents[2])[0];
+            confirmButton.setShortcut(Keyboard.KEY_G, false);
+            Object oldListener = utils.buttonGetListener(confirmButton);
+            utils.buttonSetListener(confirmButton, new ActionListener() {
+                @Override
+                public void actionPerformed(Object inputEvent, Object uiElement) {
+                    if (currSelectedSystem != null) {
+                        dialog.removeComponent(currSelectedSystem);
+                    }
+                    utils.actionPerformed(oldListener, inputEvent, uiElement);
+                }
+            }.getProxy());
 
             this.panelWidth = this.innerPanel.getPosition().getWidth() / 2f;
             this.panelHeight = this.innerPanel.getPosition().getHeight() - 10f;
 
             buildSystemsTable(buildGatesTables());
+
+            screenPanel.addComponent(this.interceptor = Global.getSettings().createCustom(0f,0f, new BaseCustomUIPanelPlugin() {
+                @Override
+                public void processInput(List<InputEventAPI> events) {
+                    if (currSelectedSystem == null) return;
+
+                    for (InputEventAPI e : events) {
+                        if ((e.isLMBDownEvent())) {
+                            if (UiUtil.isInBounds(currSelectedSystem.getPosition(), e.getX(), e.getY())) {
+                                e.consume();
+                                continue;
+                            } else if (!UiUtil.isInBounds(dialog.getPosition(), e.getX(), e.getY())) {
+                                ((DummyMapPingToken)currSelectedSystem.getPlugin()).flickerNoise();
+                            }
+
+                        } else if (e.isRMBDownEvent()) {
+                            if (!UiUtil.isInBounds(currSelectedSystem.getPosition(), e.getX(), e.getY()) && !UiUtil.isInBounds(dialog.getPosition(), e.getX(), e.getY())) {
+                                ((DummyMapPingToken)currSelectedSystem.getPlugin()).flickerNoise();
+                            }
+                        }
+                    }
+                }
+            }));
         }
 
         private DialogDismissedListener createDialogDismissedListener() {
+            isShowingEntityPicker = true;
             return new DialogDismissedListener() {
                 @Override
                 public void dialogDismissed(Object dialog, int yesOrNo) {
@@ -476,6 +632,8 @@ public class AutoPilotGatesAbility extends BaseToggleAbility {
                         return;
                     }
                     applyGateSelection();
+                    isShowingEntityPicker = false;
+                    screenPanel.removeComponent(interceptor);
                 }
             };
         }
@@ -522,8 +680,8 @@ public class AutoPilotGatesAbility extends BaseToggleAbility {
                 List<SectorEntityToken> gates = entry.getValue();
                 sortAlphabetically(gates);
 
-                CustomPanelAPI panel = Global.getSettings().createCustom(gatesTableWidth + 5f, gatesTableHeight, null);
-                TooltipMakerAPI tooltip = panel.createUIElement(gatesTableWidth + 5f, gatesTableHeight, true);
+                CustomPanelAPI tablePanel = Global.getSettings().createCustom(gatesTableWidth + 5f, gatesTableHeight, null);
+                TooltipMakerAPI tooltip = tablePanel.createUIElement(gatesTableWidth + 5f, gatesTableHeight, true);
                 
                 UITable table = (UITable) tooltip.beginTable(
                     baseColor, darkColor, Misc.getHighlightedOptionColor(),
@@ -538,15 +696,41 @@ public class AutoPilotGatesAbility extends BaseToggleAbility {
                         doReselect = true;
                     } else {
                         createGateRow(tooltip, table, gate, baseColor, false);
-                    } 
+                    }
                 }
 
                 tooltip.addTable("", 0, 0f);
                 ((UIPanelAPI) table).getPosition().setXAlignOffset(0f).setYAlignOffset(-5f);
                 table.setItemsSelectable(true);
-                
-                panel.addUIElement(tooltip).inTL(0f, 0f);
-                systemsToTablePanels.put(system, panel);
+                tablePanel.addUIElement(tooltip).inTL(0f, 0f);
+
+                DummyMapPingToken tokenPlugin = new DummyMapPingToken(system);
+                CustomPanelAPI hyperMapPanel = Global.getSettings().createCustom(400f, 300f, tokenPlugin);
+                TooltipMakerAPI hyperMapTt = hyperMapPanel.createUIElement(400f, 300f, false);
+                UIPanelAPI hyperMapContainer = hyperMapTt.addSectorMap(400, 300f, system, 0f);
+                hyperMapContainer.getPosition().setXAlignOffset(0f);
+                hyperMapPanel.addUIElement(hyperMapTt);
+
+                List<UIComponentAPI> children = utils.getChildrenNonCopy(hyperMapContainer);
+                children.add(children.size()-1, Global.getSettings().createCustom(0f,0f,new BaseCustomUIPanelPlugin() {
+                // this is to stop flickernoise of native dialog on right click but maintain right click control on the map
+                    @Override
+                    public void processInput(List<InputEventAPI> events) {
+                        if (currSelectedSystem == null) return;
+
+                        for (InputEventAPI e : events) {
+                            if (e.isRMBDownEvent() && UiUtil.isInBounds(hyperMapPanel.getPosition(), e.getX(), e.getY())) {
+                                e.consume();
+                            }
+                        }
+                    }
+                }));
+
+                UIComponentAPI mapController = children.get(children.size()-1);
+                UIPanelAPI hyperMap = utils.mapTabGetMap(mapController);
+                tokenPlugin.init(hyperMapPanel, mapController, hyperMap);
+
+                systemsToTablePanels.put(system, new CustomPanelAPI[] {tablePanel, hyperMapPanel});
 
                 if (doReselect) reselect = system;
             }
@@ -627,7 +811,9 @@ public class AutoPilotGatesAbility extends BaseToggleAbility {
                 dialog.addComponent(interceptor = Global.getSettings().createCustom(0f,0f, new BaseCustomUIPanelPlugin() {
                     @Override
                     public void processInput(List<InputEventAPI> events) {
-                        for (InputEventAPI e : events) e.consume();
+                        for (InputEventAPI e : events) {
+                            e.consume();
+                        } 
                     }
                 }));
 
@@ -701,9 +887,12 @@ public class AutoPilotGatesAbility extends BaseToggleAbility {
             }
 
             utils.uiTableSelect(systemsTable, null, null);
-            List<UIComponentAPI> children = utils.getChildrenNonCopy(innerPanel);
-            innerPanel.removeComponent(children.get(children.size() - 1));
-            
+            innerPanel.removeComponent(currSelectedGates);
+            dialog.removeComponent(currSelectedSystem);
+
+            currSelectedGates = null;
+            currSelectedSystem = null;
+
             wasPicked = false;
             pickedGate = null;
             event.consume();
@@ -724,6 +913,7 @@ public class AutoPilotGatesAbility extends BaseToggleAbility {
                     Object selected = utils.uiTableGetSelected(systemsTable);
                     if (selected != null) {
                         if (row == selected) {
+                            currSelectedSystem.getPlugin().positionChanged(null);
                             utils.actionPerformed(oldListener, inputEvent, uiElement);
                             return;
                         }
@@ -746,15 +936,25 @@ public class AutoPilotGatesAbility extends BaseToggleAbility {
                     if (!"reselect".equals(inputEvent))
                         hiddenSystemsScrollY = tooltip.getExternalScroller().getYOffset();
 
-                    if (currSelected != null) innerPanel.removeComponent(currSelected);
-                    currSelected = systemsToTablePanels.get(system);
+                    if (currSelectedGates != null) {
+                        innerPanel.removeComponent(currSelectedGates);
+                    }
+                    if (currSelectedSystem != null) {
+                        dialog.removeComponent(currSelectedSystem);
+                    }
+
+                    CustomPanelAPI[] currSelected = systemsToTablePanels.get(system);
+                    currSelectedGates = currSelected[0];
+                    currSelectedSystem = currSelected[1];
 
                     utils.uiTableSelect(systemsTable, row, null);
                     utils.actionPerformed(oldListener, inputEvent, uiElement);
                     wasPicked = false;
                     pickedGate = null;
 
-                    innerPanel.addComponent(currSelected).inTL(panelWidth + 4f, 5f);
+                    innerPanel.addComponent(currSelectedGates).inTL(panelWidth + 4f, 5f);
+                    dialog.addComponent(currSelectedSystem).inLMid(-currSelectedSystem.getPosition().getWidth() - 2f);
+                    currSelectedSystem.getPlugin().positionChanged(null);
                 }
             }.getProxy());
 
@@ -789,8 +989,8 @@ public class AutoPilotGatesAbility extends BaseToggleAbility {
         public void createIntelInfo(TooltipMakerAPI info, IntelInfoPlugin.ListInfoMode mode) {
             info.setParaFontColor(Misc.getBrightPlayerColor());
 
-            if (this.isAdding) info.addPara(gateName + " in " + locName + " added to the autopilot's gate blacklist.", 0f);
-            else info.addPara(gateName + " in " + locName + " removed from the autopilot's gate blacklist.", 0f);
+            if (this.isAdding) info.addPara(gateName + " in " + locName + " added to the Autopilot's Gate Blacklist.", 0f);
+            else info.addPara(gateName + " in " + locName + " removed from the Autopilot's Gate Blacklist.", 0f);
         }
     }
 

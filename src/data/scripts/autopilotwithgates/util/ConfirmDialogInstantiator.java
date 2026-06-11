@@ -5,16 +5,26 @@ import java.lang.invoke.LambdaMetafactory;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
-import static java.lang.invoke.MethodType.methodType;
-import java.util.List;
+import java.lang.invoke.VarHandle;
 
+import static java.lang.invoke.MethodType.methodType;
+
+import java.awt.Color;
+import java.util.List;
+import java.util.Map;
+
+import org.apache.log4j.Logger;
 import org.lwjgl.input.Keyboard;
 
+import com.fs.graphics.Sprite;
+import com.fs.graphics.TextureLoader;
+import com.fs.graphics.util.Fader;
 import com.fs.starfarer.api.Global;
 import com.fs.starfarer.api.campaign.BaseCustomUIPanelPlugin;
 import com.fs.starfarer.api.campaign.CampaignEntityPickerListener;
 import com.fs.starfarer.api.campaign.FactionAPI;
 import com.fs.starfarer.api.campaign.SectorEntityToken;
+import com.fs.starfarer.api.graphics.SpriteAPI;
 import com.fs.starfarer.api.input.InputEventAPI;
 import com.fs.starfarer.api.ui.ButtonAPI;
 import com.fs.starfarer.api.ui.CustomPanelAPI;
@@ -23,11 +33,13 @@ import com.fs.starfarer.api.ui.PositionAPI;
 import com.fs.starfarer.api.ui.TooltipMakerAPI;
 import com.fs.starfarer.api.ui.UIComponentAPI;
 import com.fs.starfarer.api.ui.UIPanelAPI;
+import com.fs.starfarer.campaign.CampaignState;
 import com.fs.starfarer.campaign.command.AdminPickerDialog;
 import com.fs.starfarer.ui.newui.CampaignEntityPickerDialog;
 
 import data.scripts.autopilotwithgates.util.UiUtil.ActionListener;
 
+import static data.scripts.autopilotwithgates.util.UiUtil.print;
 import static data.scripts.autopilotwithgates.util.UiUtil.utils;
 
 public class ConfirmDialogInstantiator {
@@ -415,6 +427,181 @@ public class ConfirmDialogInstantiator {
                     }
                 }.getProxy());
             }
+        }
+    }
+
+    
+    private static Object noiseTexture;
+    private static final VarHandle noiseSeedHandle;
+    private static final MethodHandle noiseCtor;
+    private static final MethodHandle noiseFaderHandle;
+    private static final MethodHandle beginFlickerNoiseHandle;
+    private static final MethodHandle renderNoiseHandle;
+
+    private static final VarHandle noiseRngHandle;
+    private static final MethodHandle noiseRngAdvanceHandle;
+
+    static {
+        try {
+            MethodHandles.Lookup lookup = MethodHandles.lookup();
+
+            Class<?>[] paramTypes = null;
+            Class<?> textureClass = Refl.getFieldType(Refl.getFieldByName("texture", Sprite.class));
+            Class<?> noiseClass = Refl.getFieldType(Refl.getFieldByName("noise", CampaignState.class));
+            Class<?> noiseRngClass = null;
+            noiseCtor = lookup.findConstructor(noiseClass, methodType(void.class, textureClass, float.class, float.class));
+
+            VarHandle varHandle = null;
+            VarHandle varHandle2 = null;
+            MethodHandles.Lookup privateLookup = MethodHandles.privateLookupIn(noiseClass, lookup);
+
+            for (Object field : noiseClass.getDeclaredFields()) {
+                Class<?> type = Refl.getFieldType(field);
+                if (type == long.class) {
+                    varHandle = privateLookup.findVarHandle(
+                        noiseClass,
+                        Refl.getFieldName(field),
+                        long.class
+                    );
+                } else if (type != float.class && type != Fader.class && type != textureClass && type != Color.class) {
+                    noiseRngClass = type;
+                    varHandle2 = privateLookup.findVarHandle(
+                        noiseClass,
+                        Refl.getFieldName(field),
+                        type
+                    );
+                }
+            }
+            noiseSeedHandle = varHandle;
+            noiseRngHandle = varHandle2;
+
+            MethodHandle handle = null;
+            for (Object method : noiseRngClass.getDeclaredMethods()) {
+                if (Refl.getReturnType(method) == boolean.class) {
+                    handle = lookup.findVirtual(noiseRngClass, Refl.getMethodName(method), methodType(boolean.class, float.class));
+                    break;
+                }
+            }
+            noiseRngAdvanceHandle = handle;
+
+            MethodHandle handle1 = null;
+            MethodHandle handle2 = null;
+            MethodHandle handle3 = null;
+            for (Object method : noiseClass.getDeclaredMethods()) {
+                Class<?> returnType = Refl.getReturnType(method);
+
+                if (returnType == void.class) {
+                    paramTypes = Refl.getMethodParamTypes(method);
+
+                    if (paramTypes.length == 2 && paramTypes[0] == float.class && paramTypes[1] == float.class) {
+                        handle1 = lookup.findVirtual(noiseClass,
+                            Refl.getMethodName(method),
+                            methodType(void.class, float.class, float.class)
+                        );
+
+                    } else if (paramTypes.length == 3 && paramTypes[0] == float.class && paramTypes[1] == float.class && paramTypes[2] == float.class) {
+                        handle2 = lookup.findVirtual(noiseClass,
+                            Refl.getMethodName(method),
+                            methodType(void.class, float.class, float.class, float.class)
+                        );
+
+                    }
+                } else if (returnType == Fader.class) {
+                    handle3 = lookup.findVirtual(noiseClass,
+                        Refl.getMethodName(method),
+                        methodType(Fader.class)
+                    );
+                }
+            }
+            beginFlickerNoiseHandle = handle1;
+            renderNoiseHandle = handle2;
+            noiseFaderHandle = handle3;
+
+
+        } catch (Throwable e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static void refNoiseTex() {
+        try {
+            Class<?> textureClass = Refl.getFieldType(Refl.getFieldByName("texture", Sprite.class));
+            Global.getSettings().loadTexture("graphics/fx/noise.png");
+            SpriteAPI spriteApi = Global.getSettings().getSprite("graphics/fx/noise.png");
+
+            Sprite sprite = null;
+            for (Object field : spriteApi.getClass().getDeclaredFields()) {
+                if (Refl.getFieldType(field) == Sprite.class) {
+                    sprite = (Sprite) MethodHandles.privateLookupIn(spriteApi.getClass(), MethodHandles.lookup()).findVarHandle(
+                        spriteApi.getClass(),
+                        Refl.getFieldName(field),
+                        Sprite.class
+                    ).get(spriteApi);
+                    break;
+                }
+            }
+
+            noiseTexture = MethodHandles.privateLookupIn(Sprite.class, MethodHandles.lookup()).findVarHandle(
+                Sprite.class,
+                "texture",
+                textureClass
+            ).get(sprite);
+        } catch (Throwable e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static Object createNoiseRenderer(float width, float height) {
+        try {
+            Object noise = noiseCtor.invoke(noiseTexture, width, height);
+            Fader fader = (Fader) noiseFaderHandle.invoke(noise);
+            fader.setDurationOut(0.5f);
+            fader.fadeOut();
+            // fader.setDuration(0.2f, 0.2f);
+            // fader.fadeIn();
+            return noise;
+        } catch (Throwable e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static Object getNoiseRng(Object noise) {
+        return noiseRngHandle.get(noise);
+    }
+
+    public static boolean advanceNoiseRng(Object rng, float amount) {
+        try {
+            return (boolean) noiseRngAdvanceHandle.invoke(rng, amount);
+        } catch (Throwable e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static void setNoiseSeed(Object noise, long seed) {
+        noiseSeedHandle.set(noise, seed);
+    }
+
+    public static Fader getNoiseFader(Object noise) {
+        try {
+            return (Fader) noiseFaderHandle.invoke(noise);
+        } catch (Throwable e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static void beginFlickerNoise(Object noise) {
+        try {
+            beginFlickerNoiseHandle.invoke(noise, 0.0f, 0.5f);
+        } catch (Throwable e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static void renderNoise(Object noise, float x, float y, float intensity) {
+        try {
+            renderNoiseHandle.invoke(noise, x, y, intensity);
+        } catch (Throwable e) {
+            throw new RuntimeException(e);
         }
     }
 }
