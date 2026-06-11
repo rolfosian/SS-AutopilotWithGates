@@ -610,11 +610,6 @@ public class AutoPilotGatesAbility extends BaseToggleAbility {
                             } else if (!UiUtil.isInBounds(dialog.getPosition(), e.getX(), e.getY())) {
                                 ((DummyMapPingToken)currSelectedSystem.getPlugin()).flickerNoise();
                             }
-
-                        } else if (e.isRMBDownEvent()) {
-                            if (!UiUtil.isInBounds(currSelectedSystem.getPosition(), e.getX(), e.getY()) && !UiUtil.isInBounds(dialog.getPosition(), e.getX(), e.getY())) {
-                                ((DummyMapPingToken)currSelectedSystem.getPlugin()).flickerNoise();
-                            }
                         }
                     }
                 }
