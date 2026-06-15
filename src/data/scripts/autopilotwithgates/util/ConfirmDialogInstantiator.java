@@ -50,6 +50,7 @@ public class ConfirmDialogInstantiator {
     private static final MethodHandle confirmDialogGetButtonHandle;
     private static final MethodHandle confirmDialogShowHandle;
     private static final MethodHandle confirmDialogGetInnerPanelHandle;
+    private static final MethodHandle confirmDialogSetRightClickOutsideCancelsHandle;
 
     private static CallSite dialogDismissedCallSite;
 
@@ -113,6 +114,11 @@ public class ConfirmDialogInstantiator {
                 confirmDialogClass,
                 "getButton",
                 methodType(buttonClass, int.class)
+            );
+            confirmDialogSetRightClickOutsideCancelsHandle = lookup.findVirtual(
+                confirmDialogClass,
+                "setRightClickOutsideCancels",
+                methodType(void.class, boolean.class)
             );
 
             MethodType factoryType = methodType(dialogDismissedInterface, DialogDismissedListenerProxy.class);
@@ -224,6 +230,21 @@ public class ConfirmDialogInstantiator {
         int cancelButtonIndex,
         String... buttonTexts
     ) {
+        return showConfirmDialog(dialogParent, backgroundImage, true, title, width, height, dialogDismissedListener, confirmButtonIndex, cancelButtonIndex, buttonTexts);
+    }
+
+    public static Object[] showConfirmDialog(
+        UIPanelAPI dialogParent,
+        String backgroundImage,
+        boolean rightClickOutsideCancels,
+        String title,
+        float width,
+        float height,
+        DialogDismissedListener dialogDismissedListener,
+        int confirmButtonIndex,
+        int cancelButtonIndex,
+        String... buttonTexts
+    ) {
         Object[] dialogComponents = createConfirmDialog(dialogParent, title, width, height, dialogDismissedListener, buttonTexts);
         ButtonAPI[] btns = (ButtonAPI[]) dialogComponents[2];
 
@@ -234,13 +255,14 @@ public class ConfirmDialogInstantiator {
         LabelAPI label = utils.confirmDialogGetLabel(confirmDialog);
         UIPanelAPI innerPanel = utils.confirmDialogGetInnerPanel(confirmDialog);
         
-        BackGroundImagePanelPlugin imagePanelPlugin = new BackGroundImagePanelPlugin(confirmDialog);
+        BackGroundImagePanelPlugin imagePanelPlugin = new BackGroundImagePanelPlugin(confirmDialog, rightClickOutsideCancels);
         imagePanelPlugin.addBackgroundImage(confirmButton, cancelButton, backgroundImage);
 
         innerPanel.bringComponentToTop((UIComponentAPI)label);
         for (ButtonAPI btn : btns) innerPanel.bringComponentToTop((UIComponentAPI)btn);
 
         try {
+            confirmDialogSetRightClickOutsideCancelsHandle.invoke(confirmDialog, rightClickOutsideCancels);
             confirmDialogShowHandle.invoke(confirmDialog, 0.25f, 0.25f);
         } catch (Throwable e) {
             throw new RuntimeException(e);
@@ -324,6 +346,8 @@ public class ConfirmDialogInstantiator {
     }
 
     public static class BackGroundImagePanelPlugin extends BaseCustomUIPanelPlugin {
+        private final boolean rightClickOutsideCancels;
+
         private UIPanelAPI dialog;
         private CustomPanelAPI imagePanel; 
         private TooltipMakerAPI tt;
@@ -336,9 +360,11 @@ public class ConfirmDialogInstantiator {
         private float dialogTopBound;
         private float dialogBottomBound;
 
-        public BackGroundImagePanelPlugin(UIPanelAPI dialog) {
+        public BackGroundImagePanelPlugin(UIPanelAPI dialog, boolean rightClickOutsideCancels) {
             super();
             this.dialog = dialog;
+
+            this.rightClickOutsideCancels = rightClickOutsideCancels;
 
             PositionAPI dialogPos = dialog.getPosition();
             this.dialogLeftBound = dialogPos.getCenterX() - dialogPos.getWidth() / 2;
@@ -355,7 +381,7 @@ public class ConfirmDialogInstantiator {
         @Override
         public void processInput(List<InputEventAPI> events) {
             for (InputEventAPI event : events) {
-                if ((event.isKeyDownEvent() && Keyboard.isKeyDown(Keyboard.KEY_ESCAPE)) || (event.isRMBDownEvent() && isOutsideDialogBounds(event.getX(), event.getY()))) {
+                if ((event.isKeyDownEvent() && Keyboard.isKeyDown(Keyboard.KEY_ESCAPE)) || (this.rightClickOutsideCancels && event.isRMBDownEvent() && isOutsideDialogBounds(event.getX(), event.getY()))) {
                     imagePanel.setOpacity(0f);
                     tt.setOpacity(0f);
                     imagePanel.removeComponent(tt);

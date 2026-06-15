@@ -20,6 +20,7 @@ import com.fs.graphics.util.Fader;
 import com.fs.starfarer.api.Global;
 import com.fs.starfarer.api.campaign.CampaignFleetAPI;
 import com.fs.starfarer.api.campaign.CampaignUIAPI;
+import com.fs.starfarer.api.campaign.LocationAPI;
 import com.fs.starfarer.api.campaign.SectorEntityToken;
 import com.fs.starfarer.api.campaign.comm.IntelInfoPlugin;
 import com.fs.starfarer.api.impl.campaign.intel.BaseIntelPlugin;
@@ -77,9 +78,13 @@ public class UiUtil implements Opcodes {
 
         public UIPanelAPI eventsPanelGetMap(EventsPanel eventsPanel);
         public UIPanelAPI mapTabGetMap(Object mapTab);
+        public Object mapTabGetParams(UIPanelAPI mapTab);
         public void mapTabCenterOnEntity(Object mapTab, SectorEntityToken entity);
+        public void mapTabCenterOn(Object mapTab, Vector2f loc);
+        public void mapTabZoomOutAndCenter(Object mapTab);
 
         public BaseLocation mapGetLocation(UIPanelAPI map);
+        public void mapSetLocation(UIPanelAPI map, LocationAPI location);
         public UIPanelAPI mapGetMapTab(UIPanelAPI map);
         public void mapAddPing(UIPanelAPI map, SectorEntityToken entity, Color color, float maxRadius, int count, float interval);
         public boolean isRadarMode(UIPanelAPI map);
@@ -101,6 +106,8 @@ public class UiUtil implements Opcodes {
         public Object buttonGetListener(Object button);
         public Fader buttonGetGlowFader(Object button);
 
+        public void inputEventSetEventValue(InputEventAPI event, int value);
+
         public List<Object> uiTableGetRows(UITable table);
         public void uiTableAddRow(UITable table, Object row);
         public void uiTableRemoveRow(UITable table, Object row);
@@ -117,11 +124,13 @@ public class UiUtil implements Opcodes {
         public void uiTableSelect(UITable table, Object row, Object inputEvent, boolean notifyDelegate);
         public UIPanelAPI uiTableGetList(UITable table);
         
+        public void uiComponentProcessInput(UIComponentAPI uiComponent, List<InputEventAPI> events);
         public Object uiComponentGetTooltip(Object uiComponent);
         public void uiComponentShowTooltip(Object uiComponent, Object tooltip);
         public void uiComponentHideTooltip(Object uiComponent, Object tooltip);
         public UIPanelAPI getContents(Object tooltip);
         public UIPanelAPI getParent(UIComponentAPI component);
+        public LabelAPI tooltipWrapperGetTitle(Object tooltipWrapper);
 
         public void uiPanelFakeAdvance(UIPanelAPI uiPanel, float amount);
         public List<UIComponentAPI> getChildrenNonCopy(UIPanelAPI uiPanel);
@@ -132,6 +141,7 @@ public class UiUtil implements Opcodes {
     // With this we can implement the above interface and generate a class at runtime to call obfuscated class methods platform agnostically without reflection overhead
     private static Class<?>[] implementUtilInterface(Class<?> coreClass, Class<?> abilityPanelClass, Class<?> actionListenerInterface) {
         String listDesc = Type.getDescriptor(List.class);
+        String vector2fDesc = Type.getDescriptor(Vector2f.class);
 
         String coreClassInternalName = Type.getInternalName(coreClass);
 
@@ -146,6 +156,7 @@ public class UiUtil implements Opcodes {
         String mapTabInternalName = Type.getInternalName(mapTabClass);
 
         Class<?> mapClass = Refl.getReturnType(Refl.getMethod("getMap", mapTabClass));
+        Class<?> mapParamsClass = Refl.getReturnType(Refl.getMethod("getParams", mapTabClass));
         String mapClassInternalName = Type.getInternalName(mapClass);
 
         Class<?> uiPanelClass = mapClass.getSuperclass();
@@ -158,10 +169,43 @@ public class UiUtil implements Opcodes {
         String confirmDialogInternalName = Type.getInternalName(CampaignEntityPickerDialog.class.getSuperclass());
 
         Class<?> buttonClass = Refl.getFieldType(Refl.getFieldByInterface(ButtonAPI.class, EventsPanel.class));
+        Class<?> labelClass = Global.getSettings().createLabel("", Fonts.DEFAULT_SMALL).getClass();
+        Class<?> tooltipWrapperBoxClass = null;
+
+        for (Object field : EventsPanel.class.getDeclaredFields()) {
+            Class<?> fieldType = Refl.getFieldType(field);
+            if (fieldType.getSuperclass() == uiPanelClass) {
+                boolean hasTitleField = false;
+                boolean hasCenterTextField = false;
+                boolean hastitleHeightField = false;
+
+                for (Object fielde : fieldType.getDeclaredFields()) {
+                    Class<?> fieldeType = Refl.getFieldType(fielde);
+
+                    if (fieldeType == labelClass) {
+                        String fieldName = Refl.getFieldName(fielde);
+
+                        if (fieldName.equals("title")) hasTitleField = true;
+                        else if (fieldName.equals("centerText")) hasCenterTextField = true;
+                        continue;
+                    } else if (fieldeType == float.class && Refl.getFieldName(fielde).equals("titleHeight")) {
+                        hastitleHeightField = true;
+                    }
+                }
+
+                if (hasTitleField && hasCenterTextField && hastitleHeightField) {
+                    tooltipWrapperBoxClass = fieldType;
+                    break;
+                }
+            }
+        }
 
         String buttonClassInternalName = Type.getInternalName(buttonClass);
         String actionListenerInterfaceDesc = Type.getDescriptor(actionListenerInterface);
         String actionListenerInterfaceInternalName = Type.getInternalName(actionListenerInterface);
+
+        Class<?> inputEventClass = Refl.getMethodParamTypes(Refl.getMethod("buttonPressed", buttonClass))[0];
+        Class<?> inputEventListClass = Refl.getMethodParamTypes(Refl.getMethodDeclared("processInputImpl", uiPanelClass))[0];
 
         Class<?> intelTabClass = Refl.getReturnType(Refl.getMethod("getIntelTab", EventsPanel.class));
         String intelTabInternalName = Type.getInternalName(intelTabClass);
@@ -188,6 +232,7 @@ public class UiUtil implements Opcodes {
         String uiPanelDesc = Type.getDescriptor(uiPanelClass);
         String mapTabDesc = Type.getDescriptor(mapTabClass);
         String sectorEntityTokenDesc = Type.getDescriptor(SectorEntityToken.class);
+        String uiComponentApiDesc = Type.getDescriptor(UIComponentAPI.class);
         String uiPanelAPIDesc = Type.getDescriptor(UIPanelAPI.class);
         String buttonAPIDesc = Type.getDescriptor(ButtonAPI.class);
         String buttonClassDesc = Type.getDescriptor(buttonClass);
@@ -468,6 +513,36 @@ public class UiUtil implements Opcodes {
             mv.visitEnd();
         }
 
+        // public Object mapTabGetParams(UIPanelAPI mapTab) {
+        //     return ((mapTabClass)mapTab).getParams();
+        // }
+        {
+            MethodVisitor mv = cw.visitMethod(
+                ACC_PUBLIC,
+                "mapTabGetParams",
+                "(" + uiPanelAPIDesc + ")Ljava/lang/Object;",
+                null,
+                null
+            );
+            mv.visitCode();
+
+            mv.visitVarInsn(ALOAD, 1);
+            mv.visitTypeInsn(CHECKCAST, mapTabInternalName);
+
+            mv.visitMethodInsn(
+                INVOKEVIRTUAL,
+                mapTabInternalName,
+                "getParams",
+                "()" + Type.getDescriptor(mapParamsClass),
+                false
+            );
+
+            mv.visitInsn(ARETURN);
+
+            mv.visitMaxs(0, 0);
+            mv.visitEnd();
+        }
+
         // public void mapTabCenterOnEntity(Object mapTab, SectorEntityToken entity) {
         //     ((mapTabClass)mapTab).centerOnEntity(entity);
         // }
@@ -491,6 +566,67 @@ public class UiUtil implements Opcodes {
                 mapTabInternalName,
                 "centerOnEntity",
                 "(" + sectorEntityTokenDesc + ")V",
+                false
+            );
+
+            mv.visitInsn(RETURN);
+
+            mv.visitMaxs(0, 0);
+            mv.visitEnd();
+        }
+
+        // public void mapTabCenterOnEntity(Object mapTab, SectorEntityToken entity) {
+        //     ((mapTabClass)mapTab).centerOnEntity(entity);
+        // }
+        {
+            MethodVisitor mv = cw.visitMethod(
+                ACC_PUBLIC,
+                "mapTabCenterOn",
+                "(Ljava/lang/Object;" + vector2fDesc + ")V",
+                null,
+                null
+            );
+            mv.visitCode();
+
+            mv.visitVarInsn(ALOAD, 1);
+            mv.visitTypeInsn(CHECKCAST, mapTabInternalName);
+            mv.visitVarInsn(ALOAD, 2);
+
+            mv.visitMethodInsn(
+                INVOKEVIRTUAL,
+                mapTabInternalName,
+                "centerOn",
+                "(" + vector2fDesc + ")V",
+                false
+            );
+
+            mv.visitInsn(RETURN);
+
+            mv.visitMaxs(0, 0);
+            mv.visitEnd();
+        }
+
+        // public void mapTabZoomOutAndCenter(Object mapTab) {
+        //     ((mapTabClass)mapTab).zoomOutAndCenter();
+        // }
+        {
+            MethodVisitor mv = cw.visitMethod(
+                ACC_PUBLIC,
+                "mapTabZoomOutAndCenter",
+                "(Ljava/lang/Object;)V",
+                null,
+                null
+            );
+            mv.visitCode();
+
+            mv.visitVarInsn(ALOAD, 1);
+            mv.visitTypeInsn(CHECKCAST, mapTabInternalName);
+
+            mv.visitMethodInsn(
+                INVOKEVIRTUAL,
+                mapTabInternalName,
+                "zoomOutAndCenter",
+                "()V",
                 false
             );
 
@@ -526,6 +662,38 @@ public class UiUtil implements Opcodes {
             );
 
             mv.visitInsn(ARETURN);
+
+            mv.visitMaxs(0, 0);
+            mv.visitEnd();
+        }
+
+        // public void mapSetLocation(UIPanelAPI map, LocationAPI location) {
+        //     ((mapClass) map).setLocation(location);
+        // }
+        {
+            MethodVisitor mv = cw.visitMethod(
+                ACC_PUBLIC,
+                "mapSetLocation",
+                "(" + uiPanelAPIDesc + Type.getDescriptor(LocationAPI.class) + ")V",
+                null,
+                null
+            );
+            mv.visitCode();
+
+            mv.visitVarInsn(ALOAD, 1);
+            mv.visitTypeInsn(CHECKCAST, mapClassInternalName);
+            mv.visitVarInsn(ALOAD, 2);
+            mv.visitTypeInsn(CHECKCAST, Type.getInternalName(BaseLocation.class));
+
+            mv.visitMethodInsn(
+                INVOKEVIRTUAL,
+                mapClassInternalName,
+                "setLocation",
+                "(" + baseLocationDesc + ")V",
+                false
+            );
+
+            mv.visitInsn(RETURN);
 
             mv.visitMaxs(0, 0);
             mv.visitEnd();
@@ -592,7 +760,7 @@ public class UiUtil implements Opcodes {
         }
 
         // public void mapAddPing(UIPanelAPI map, SectorEntityToken entity, Color color, float maxRadius, int count, float interval) {
-        //     ((mapClass)map).addPing(entity, color, maxRadius, count, interval);
+        //     return ((mapClass)map).addPing(entity, color, maxRadius, count, interval);
         // }
         {
             MethodVisitor mv = cw.visitMethod(
@@ -767,7 +935,7 @@ public class UiUtil implements Opcodes {
                 INVOKEVIRTUAL,
                 confirmDialogInternalName,
                 "getLabel",
-                "()" + Type.getDescriptor(Global.getSettings().createLabel("", Fonts.DEFAULT_SMALL).getClass()),
+                "()" + Type.getDescriptor(labelClass),
                 false
             );
 
@@ -778,10 +946,9 @@ public class UiUtil implements Opcodes {
         }
 
         // public void confirmDialogSetRightClickOutsideCancels(Object confirmDialog, boolean rightClickOutsideCancels) {
-        //     return ((confirmDialogClass)confirmDialog).setRightClickOutsideCancels(rightClickOutsideCancels);
+        //     return ((confirmDialogClass)confirmDialog).getLabel();
         // }
         {
-            String internalName = Type.getInternalName(CampaignEntityPickerDialog.class.getSuperclass().getSuperclass());
             MethodVisitor mv = cw.visitMethod(
                 ACC_PUBLIC,
                 "confirmDialogSetRightClickOutsideCancels",
@@ -792,12 +959,13 @@ public class UiUtil implements Opcodes {
             mv.visitCode();
 
             mv.visitVarInsn(ALOAD, 1);
-            mv.visitTypeInsn(CHECKCAST, internalName);
+            mv.visitTypeInsn(CHECKCAST, confirmDialogInternalName);
+
             mv.visitVarInsn(ILOAD, 2);
 
             mv.visitMethodInsn(
                 INVOKEVIRTUAL,
-                internalName,
+                confirmDialogInternalName,
                 "setRightClickOutsideCancels",
                 "(Z)V",
                 false
@@ -1177,6 +1345,38 @@ public class UiUtil implements Opcodes {
             );
 
             mv.visitInsn(ARETURN);
+
+            mv.visitMaxs(0, 0);
+            mv.visitEnd();
+        }
+
+        // public Object inputEventSetEventValue(InputEventAPI event, int value) {
+        //     ((eventClass)event).setEventValue(value);
+        // }
+        {
+            String inputEventInternalName = Type.getDescriptor(inputEventClass);
+            MethodVisitor mv = cw.visitMethod(
+                ACC_PUBLIC,
+                "inputEventSetEventValue",
+                "(" + Type.getDescriptor(InputEventAPI.class) + "I)V",
+                null,
+                null
+            );
+            mv.visitCode();
+
+            mv.visitVarInsn(ALOAD, 1);
+            mv.visitTypeInsn(CHECKCAST, inputEventInternalName);
+            mv.visitVarInsn(ILOAD, 1);
+
+            mv.visitMethodInsn(
+                INVOKEVIRTUAL,
+                inputEventInternalName,
+                "setEventValue",
+                "(I)V",
+                false
+            );
+
+            mv.visitInsn(RETURN);
 
             mv.visitMaxs(0, 0);
             mv.visitEnd();
@@ -1623,7 +1823,7 @@ public class UiUtil implements Opcodes {
             MethodVisitor mv = cw.visitMethod(
                 ACC_PUBLIC,
                 "getParent",
-                "(" + Type.getDescriptor(UIComponentAPI.class) + ")" + uiPanelAPIDesc,
+                "(" + uiComponentApiDesc + ")" + uiPanelAPIDesc,
                 null,
                 null
             );
@@ -1707,7 +1907,7 @@ public class UiUtil implements Opcodes {
         }
 
         // public Object uiComponentShowTooltip(Object uiComponent, Object tooltip) {
-        //     ((uiComponentClass)uiComponent).showTooltip();
+        //     ((uiComponentClass)uiComponent).showTooltip(tooltip);
         // }
         {
             MethodVisitor mv = cw.visitMethod(
@@ -1737,8 +1937,8 @@ public class UiUtil implements Opcodes {
             mv.visitEnd();
         }
 
-        // public Object uiComponentHideTooltip(Object button, Object tooltip) {
-        //     ((uiComponentClass)uiComponent).hideTooltip();
+        // public Object uiComponentHideTooltip(Object uiComponent, Object tooltip) {
+        //     ((uiComponentClass)uiComponent).hideTooltip(tooltip);
         // }
         {
             MethodVisitor mv = cw.visitMethod(
@@ -1768,6 +1968,72 @@ public class UiUtil implements Opcodes {
             mv.visitEnd();
         }
 
+        // public Object uiComponentProcessInput(UIComponentAPI uiComponent, List<InputEventAPI> events) {
+        //     ((uiComponentClass)uiComponent).processInput((inputEventClass)events);
+        // }
+        {
+            MethodVisitor mv = cw.visitMethod(
+                ACC_PUBLIC,
+                "uiComponentProcessInput",
+                "(" + uiComponentApiDesc + listDesc + ")V",
+                null,
+                null
+            );
+            mv.visitCode();
+
+            mv.visitVarInsn(ALOAD, 1);
+            mv.visitTypeInsn(CHECKCAST, uiComponentInternalName);
+            mv.visitVarInsn(ALOAD, 2);
+            mv.visitTypeInsn(CHECKCAST, Type.getInternalName(inputEventListClass));
+
+            mv.visitMethodInsn(
+                INVOKEVIRTUAL,
+                uiComponentInternalName,
+                "processInput",
+                "(" + Type.getDescriptor(inputEventListClass) + ")V",
+                false
+            );
+
+            mv.visitInsn(RETURN);
+
+            mv.visitMaxs(0, 0);
+            mv.visitEnd();
+        }
+
+        // public LabelAPI tooltipWrapperGetTitle(Object tooltipWrapper) {
+        //     return ((tooltipWrapperClass)tooltipWrapper).getTitle();
+        // }
+        {
+            String tooltipWrapperDesc = Type.getDescriptor(tooltipWrapperBoxClass);
+            String tooltipWrapperInternalName = Type.getInternalName(tooltipWrapperBoxClass);
+            String labelDesc = Type.getDescriptor(labelClass);
+
+            MethodVisitor mv = cw.visitMethod(
+                ACC_PUBLIC,
+                "tooltipWrapperGetTitle",
+                "(Ljava/lang/Object;)" + Type.getDescriptor(LabelAPI.class),
+                null,
+                null
+            );
+            mv.visitCode();
+
+            mv.visitVarInsn(ALOAD, 1);
+            mv.visitTypeInsn(CHECKCAST, tooltipWrapperInternalName);
+
+            mv.visitMethodInsn(
+                INVOKEVIRTUAL,
+                tooltipWrapperInternalName,
+                "getTitle",
+                "()" + labelDesc,
+                false
+            );
+
+            mv.visitInsn(ARETURN);
+
+            mv.visitMaxs(0, 0);
+            mv.visitEnd();
+        }
+
         // public List<UIComponentAPI> getChildrenNonCopy(UIComponentAPI parent) {
         //     if (parent instanceof uiPanelClass) {
         //         return ((uiPanelClass)parent).getChildrenNonCopy();
@@ -1778,7 +2044,7 @@ public class UiUtil implements Opcodes {
             MethodVisitor mv = cw.visitMethod(
                 ACC_PUBLIC,
                 "getChildrenNonCopy",
-                "(" + Type.getDescriptor(UIComponentAPI.class) + ")Ljava/util/List;",
+                "(" + uiComponentApiDesc + ")Ljava/util/List;",
                 null,
                 null
             );
@@ -1881,13 +2147,16 @@ public class UiUtil implements Opcodes {
                 }
             }.define(cw.toByteArray(), "data.scripts.autopilotwithgates.util.UtilInterface"),
             mapClass,
+            mapParamsClass,
             uiPanelClass,
             uiComponentClass,
             messageDisplayClass,
             intelTabPlanetsPanelClass,
             mapTabClass,
             campaignStateDialogTypeEnumClass,
-            uiTableRowSubClass
+            uiTableRowSubClass,
+            inputEventClass,
+            inputEventListClass
         };
     }
 
@@ -1896,6 +2165,9 @@ public class UiUtil implements Opcodes {
     public static final Class<?> uiPanelClass;
     public static final Class<?> uiComponentClass;
 
+    private static final MethodHandle inputEventCtor;
+    private static final MethodHandle inputEventListCtor;
+
     private static final VarHandle followMouseVarHandle;
     private static final VarHandle messageDisplayListVarHandle;
     private static final VarHandle coreUIAbilityPanelVarHandle;
@@ -1903,6 +2175,8 @@ public class UiUtil implements Opcodes {
     private static final VarHandle intelTabPlanetsPanelMapHandle;
     private static final VarHandle campaignEntityPickerDialogMapHandle;
     private static final VarHandle campaignFleetArrowHandle;
+
+    public static final VarHandle mapParamsLocationHandle;
 
     public static final Object DIALOG_TYPE_MENU_ENUM;
 
@@ -1924,26 +2198,21 @@ public class UiUtil implements Opcodes {
 
             Class<?> abilityPanelClass = Refl.getFieldType(Refl.getFieldByName(abilityPanelFieldName, coreClass));
             Class<?> actionListenerInterface = abilityPanelClass.getInterfaces()[0];
-            // Class<?> abilityTooltipClass = getAbilityTooltipClass(abilityPanelClass);
 
-            // VarHandle handle = null;
-            // for (Object field : abilityTooltipClass.getDeclaredFields()) {
-            //     if (Refl.getFieldType(field) == boolean.class) {
-            //         handle = MethodHandles.privateLookupIn(abilityTooltipClass, MethodHandles.lookup()).findVarHandle(
-            //             abilityTooltipClass,
-            //             Refl.getFieldName(field),
-            //             boolean.class
-            //         );
-            //     }
-            // }
-            // isOnAbilityBarHandle = handle;
             int i = 0;
             Class<?>[] result = implementUtilInterface(coreClass, abilityPanelClass, actionListenerInterface);
             utils = (UtilInterface) Refl.instantiateClass(result[i++].getConstructors()[0]);
 
             mapClass = result[i++];
+            Class<?> mapParamsClass = result[i++];
             uiPanelClass = result[i++];
             uiComponentClass = result[i++];
+
+            mapParamsLocationHandle = MethodHandles.privateLookupIn(mapParamsClass, lookup).findVarHandle(
+                mapParamsClass,
+                Refl.getFieldName(Refl.getFieldByType(BaseLocation.class, mapParamsClass)),
+                BaseLocation.class
+            );
 
             Class<?> messageDisplayClass = result[i++];
             messageDisplayListVarHandle = MethodHandles.privateLookupIn(messageDisplayClass, lookup).findVarHandle(
@@ -1959,7 +2228,7 @@ public class UiUtil implements Opcodes {
                 Refl.getFieldName(Refl.getFieldByType(mapTabClass, intelTabPlanetsPanelClass)),
                 mapTabClass
             );
-
+            
             Object targetEnum = null;
             for (Object e : result[i++].getEnumConstants()) {
                 if (String.valueOf(e).equals("MENU")) {
@@ -2044,6 +2313,20 @@ public class UiUtil implements Opcodes {
             }
             abilityPanelPrevButtonHandle = prevHandle;
             abilityPanelNextButtonHandle = nextHandle;
+
+            Class<?> inputEventClass = result[i++];
+            inputEventCtor = lookup.findConstructor(inputEventClass, MethodType.methodType(
+                void.class,
+                InputEventClass.class,
+                InputEventType.class,
+                int.class,
+                int.class,
+                int.class,
+                char.class
+            ));
+
+            Class<?> inputEventListClass = result[i++];
+            inputEventListCtor = lookup.findConstructor(inputEventListClass, MethodType.methodType(void.class));
             
             MethodType factoryType = MethodType.methodType(actionListenerInterface, ActionListenerProxy.class);
             MethodType actualSamMethodType = MethodType.methodType(void.class, Object.class, Object.class);
@@ -2076,6 +2359,29 @@ public class UiUtil implements Opcodes {
 
     public static List<Object> getMessageDisplayList(CampaignUIAPI campaignUI) {
         return (List<Object>) messageDisplayListVarHandle.get(utils.getMessageDisplay(campaignUI));
+    }
+
+    public static InputEventAPI instantiateInputEvent(InputEventClass eventClass, InputEventType eventType, int x, int y, int val, char chare) {
+        try {
+            return (InputEventAPI) inputEventCtor.invoke(
+                eventClass,
+                eventType,
+                x,
+                y,
+                val, // keyboard key or mouse button, is -1 for mouse move
+                chare // char is only appicable for keyboard keys afaik, give '\0' for mouse prob
+            );
+        } catch (Throwable e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static List<InputEventAPI> instantiateInputList() {
+        try {
+            return (List<InputEventAPI>) inputEventListCtor.invoke();
+        } catch (Throwable e) {
+            throw new RuntimeException(e);
+        }
     }
 
     public static UIPanelAPI getMapFromIntelTab(Object intelTab) {
