@@ -30,8 +30,10 @@ import com.fs.starfarer.api.impl.campaign.abilities.BaseToggleAbility;
 import com.fs.starfarer.api.impl.campaign.ids.Tags;
 import com.fs.starfarer.api.impl.campaign.intel.BaseIntelPlugin;
 import com.fs.starfarer.api.impl.campaign.procgen.StarSystemGenerator.StarSystemType;
+
 import com.fs.starfarer.api.input.InputEventAPI;
 import com.fs.starfarer.api.input.InputEventType;
+
 import com.fs.starfarer.api.ui.Alignment;
 import com.fs.starfarer.api.ui.ButtonAPI;
 import com.fs.starfarer.api.ui.CustomPanelAPI;
@@ -44,6 +46,7 @@ import com.fs.starfarer.api.ui.TooltipMakerAPI;
 import com.fs.starfarer.api.ui.TooltipMakerAPI.TooltipLocation;
 import com.fs.starfarer.api.ui.UIComponentAPI;
 import com.fs.starfarer.api.ui.UIPanelAPI;
+
 import com.fs.starfarer.api.util.IntervalUtil;
 import com.fs.starfarer.api.util.Misc;
 import com.fs.starfarer.api.util.Pair;
@@ -681,6 +684,15 @@ public class AutoPilotGatesAbility extends BaseToggleAbility {
                 hyperMap,
                 systems
             );
+            children.add(children.size()-1, Global.getSettings().createCustom(0f,0f, new BaseCustomUIPanelPlugin() {
+                @Override
+                public void processInput(List<InputEventAPI> events) {
+                    for (InputEventAPI e : events)
+                        if (e.isRMBDownEvent() && UiUtil.isInBounds(hyperMapPanel.getPosition(), e.getX(), e.getY())) {
+                            e.consume();
+                        }
+                }
+            }));
 
             dialog.addComponent(hyperMapPanel).inLMid(-hyperMapPanel.getPosition().getWidth() - 2f);
         }
