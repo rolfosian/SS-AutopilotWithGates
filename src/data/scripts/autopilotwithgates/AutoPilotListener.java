@@ -215,6 +215,17 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
 
                     if (planetsMap != null && !this.maps.containsKey(planetsMap)) this.maps.add(planetsMap);
                 }
+            } else if (CoreUITabId.OUTPOSTS == currentCoreTabId) {
+                UIPanelAPI commandTab = utils.coreGetCurrentTab(core);
+                ButtonAPI incomeButton = utils.commandTabGetFactionsButton(commandTab);
+                if (incomeButton != null && incomeButton.isHighlighted()) {
+                    mapsPresent = true;
+                    Object intelIncomePanel = UiUtil.commandTabIntelIncomePanelHandle.get(commandTab);
+                    Object mapController = UiUtil.intelIncomePanelMapHandle.get(intelIncomePanel);
+                    UIPanelAPI map = utils.mapTabGetMap(mapController);
+
+                    if (!this.maps.containsKey(map)) this.maps.add(map);
+                }
             }
 
             if (!AutoPilotGatesAbility.isShowingEntityPicker() && !mapsPresent && !this.maps.isEmpty()) this.maps.clear();
@@ -362,7 +373,6 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
                         JumpDestination dest = new JumpDestination(exit, null);
                         Global.getSector().doHyperspaceTransition(playerFleet, interactionTarget, dest, 2f);
                         
-
                         float distLY = Misc.getDistanceLY(exit, entry);
                         ((GateEntityPlugin) exit.getCustomPlugin()).showBeingUsed(distLY);
                         ((GateEntityPlugin) entry.getCustomPlugin()).showBeingUsed(distLY);

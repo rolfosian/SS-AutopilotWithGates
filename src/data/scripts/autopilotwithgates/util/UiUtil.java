@@ -40,6 +40,7 @@ import com.fs.starfarer.campaign.CampaignState;
 import com.fs.starfarer.campaign.CampaignUIPersistentData.AbilitySlot;
 import com.fs.starfarer.campaign.CampaignUIPersistentData.AbilitySlots;
 import com.fs.starfarer.campaign.command.AdminPickerDialog;
+import com.fs.starfarer.campaign.command.IntelIncomePanel;
 import com.fs.starfarer.campaign.comms.v2.EventsPanel;
 import com.fs.starfarer.campaign.fleet.CampaignFleet;
 import com.fs.starfarer.campaign.ui.UITable;
@@ -136,6 +137,8 @@ public class UiUtil implements Opcodes {
         public List<UIComponentAPI> getChildrenNonCopy(UIPanelAPI uiPanel);
         public List<UIComponentAPI> getChildrenNonCopy(UIComponentAPI parent); // custom method with instanceof check uiPanelClass else return null
 
+        public ButtonAPI commandTabGetFactionsButton(UIPanelAPI commandTab);
+
     }
 
     // With this we can implement the above interface and generate a class at runtime to call obfuscated class methods platform agnostically without reflection overhead
@@ -199,6 +202,9 @@ public class UiUtil implements Opcodes {
                 }
             }
         }
+
+        Object iipCtor = IntelIncomePanel.class.getConstructors()[0];
+        Class<?> commandTabClass = Refl.getConstructorParamTypes(iipCtor)[0];
 
         String buttonClassInternalName = Type.getInternalName(buttonClass);
         String actionListenerInterfaceDesc = Type.getDescriptor(actionListenerInterface);
@@ -2138,6 +2144,37 @@ public class UiUtil implements Opcodes {
             mv.visitMaxs(0, 0);
             mv.visitEnd();
         }
+
+        // public ButtonAPI commandTabGetFactionsButton(UIPanelAPI commandTab) {
+        //     return ((commandTabClass)commandTab).fakeAdvance(amount);
+        // }
+        {
+            String commandTabInternalName = Type.getInternalName(commandTabClass);
+            MethodVisitor mv = cw.visitMethod(
+                ACC_PUBLIC,
+                "commandTabGetFactionsButton",
+                "(" + uiPanelAPIDesc + ")" + buttonAPIDesc,
+                null,
+                null
+            );
+            mv.visitCode();
+
+            mv.visitVarInsn(ALOAD, 1);
+            mv.visitTypeInsn(CHECKCAST, commandTabInternalName);
+
+            mv.visitMethodInsn(
+                INVOKEVIRTUAL,
+                commandTabInternalName,
+                "getFactionsButton",
+                "()" + buttonClassDesc,
+                false
+            );
+
+            mv.visitInsn(ARETURN);
+
+            mv.visitMaxs(0, 0);
+            mv.visitEnd();
+        }
         
         cw.visitEnd();
         return new Class<?>[] {
@@ -2156,7 +2193,8 @@ public class UiUtil implements Opcodes {
             campaignStateDialogTypeEnumClass,
             uiTableRowSubClass,
             inputEventClass,
-            inputEventListClass
+            inputEventListClass,
+            commandTabClass
         };
     }
 
@@ -2177,6 +2215,9 @@ public class UiUtil implements Opcodes {
     private static final VarHandle campaignFleetArrowHandle;
 
     public static final VarHandle mapParamsLocationHandle;
+
+    public static final VarHandle commandTabIntelIncomePanelHandle;
+    public static final VarHandle intelIncomePanelMapHandle;
 
     public static final Object DIALOG_TYPE_MENU_ENUM;
 
@@ -2343,6 +2384,32 @@ public class UiUtil implements Opcodes {
             );
 
             ConfirmDialogInstantiator.init();
+
+            Class<?> commandTabClass = result[i++];
+
+            for (Object field : commandTabClass.getDeclaredFields()) {
+                if (Refl.getFieldType(field) == IntelIncomePanel.class) {
+                    handle = MethodHandles.privateLookupIn(commandTabClass, lookup).findVarHandle(
+                        commandTabClass,
+                        Refl.getFieldName(field),
+                        IntelIncomePanel.class
+                    );
+                    break;
+                }
+            }
+            commandTabIntelIncomePanelHandle = handle;
+
+            for (Object field : IntelIncomePanel.class.getDeclaredFields()) {
+                if (Refl.getFieldType(field) == mapTabClass) {
+                    handle = MethodHandles.privateLookupIn(IntelIncomePanel.class, lookup).findVarHandle(
+                        IntelIncomePanel.class,
+                        Refl.getFieldName(field),
+                        mapTabClass
+                    );
+                    break;
+                }
+            }
+            intelIncomePanelMapHandle = handle;
 
         } catch (Throwable e) {
             throw new RuntimeException(e);
