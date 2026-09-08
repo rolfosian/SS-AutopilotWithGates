@@ -49,6 +49,7 @@ import com.fs.starfarer.ui.newui.CampaignEntityPickerDialog;
 
 import data.scripts.autopilotwithgates.org.objectweb.asm.*;
 
+@SuppressWarnings("unchecked")
 public class UiUtil implements Opcodes {
     private static final Logger logger = Logger.getLogger(UiUtil.class);
     public static void print(Object... args) {
@@ -140,6 +141,8 @@ public class UiUtil implements Opcodes {
         public ButtonAPI commandTabGetFactionsButton(UIPanelAPI commandTab);
 
     }
+
+    static final boolean frEnabled = System.getProperty("java.class.path").contains("fr.jar");
 
     // With this we can implement the above interface and generate a class at runtime to call obfuscated class methods platform agnostically without reflection overhead
     private static Class<?>[] implementUtilInterface(Class<?> coreClass, Class<?> abilityPanelClass, Class<?> actionListenerInterface) {
@@ -2567,19 +2570,14 @@ public class UiUtil implements Opcodes {
         }
     }
 
-    @FunctionalInterface
-    private static interface DummyActionListenerInterface {
-        public void actionPerformed(Object arg0, Object arg1);
-    }
-
-    private static class ActionListenerProxy implements DummyActionListenerInterface {
+    private static class ActionListenerProxy {
         private final ActionListener proxyTriggerClassInstance;
 
         public ActionListenerProxy(ActionListener proxyTriggerClassInstance) {
             this.proxyTriggerClassInstance = proxyTriggerClassInstance;
         }
 
-        @Override
+        @SuppressWarnings("unused")
         public void actionPerformed(Object arg0, Object arg1) {
             proxyTriggerClassInstance.actionPerformed(arg0, arg1);
         }
@@ -2660,7 +2658,7 @@ public class UiUtil implements Opcodes {
             }
         }, 0);
 
-        return foundName[0];
+        return frEnabled ? FrIllegals.transform(foundName[0]) : foundName[0];
     }
 
     private static String[] getPrevNextButtonFieldNames(Class<?> abilityPanelClass) {
@@ -2691,7 +2689,7 @@ public class UiUtil implements Opcodes {
             }
         }, 0);
 
-        return fields;
+        return frEnabled ? FrIllegals.transform(fields) : fields;
     }
 
     private static String[] getZoomTrackerMethodNames(Class<?> zoomTrackerClass) {
@@ -2792,7 +2790,7 @@ public class UiUtil implements Opcodes {
             }
         }, 0);
 
-        return foundNames;
+        return frEnabled ? FrIllegals.transform(foundNames) : foundNames;
     }
 
     private static final int TABLE_SIZE = (int)Math.sqrt(1048576.0);

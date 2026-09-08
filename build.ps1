@@ -23,8 +23,8 @@ if (-not (Test-Path $buildDir)) {
 }
 
 $dependencies = @(
-    "../../starsector-core/starfarer.api.jar",
     "../../starsector-core/starfarer_obf.jar",
+    "../../starsector-core/starfarer.api.jar",
     "../../starsector-core/fs.common_obf.jar",
     "../../starsector-core/fs.sound_obf.jar",
     "../../starsector-core/janino.jar",
@@ -37,7 +37,8 @@ $dependencies = @(
 
     "../LunaLib/jars/LunaLib.jar",
     "../Console Commands/jars/lw_console.jar",
-    "../Ashes of  The Domain- Vaults of Knowledge/jars/Vok.jar"
+    "../Ashes of  The Domain- Vaults of Knowledge/jars/Vok.jar",
+    "./obf/fr.agent.jar"
 )
 
 foreach ($dep in $dependencies) {
