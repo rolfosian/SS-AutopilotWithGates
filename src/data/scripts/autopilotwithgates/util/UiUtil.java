@@ -2197,7 +2197,8 @@ public class UiUtil implements Opcodes {
             uiTableRowSubClass,
             inputEventClass,
             inputEventListClass,
-            commandTabClass
+            commandTabClass,
+            intelTabClass
         };
     }
 
@@ -2205,6 +2206,10 @@ public class UiUtil implements Opcodes {
     public static final Class<?> mapClass;
     public static final Class<?> uiPanelClass;
     public static final Class<?> uiComponentClass;
+
+    public static final Class<?> mapTabClass;
+    public static final Class<?> intelTabClass;
+    public static final Class<?> commandTabClass;
 
     private static final MethodHandle inputEventCtor;
     private static final MethodHandle inputEventListCtor;
@@ -2266,7 +2271,7 @@ public class UiUtil implements Opcodes {
             );
 
             Class<?> intelTabPlanetsPanelClass = result[i++];
-            Class<?> mapTabClass = result[i++];
+            mapTabClass = result[i++];
             intelTabPlanetsPanelMapHandle = MethodHandles.privateLookupIn(intelTabPlanetsPanelClass, lookup).findVarHandle(
                 intelTabPlanetsPanelClass,
                 Refl.getFieldName(Refl.getFieldByType(mapTabClass, intelTabPlanetsPanelClass)),
@@ -2388,7 +2393,8 @@ public class UiUtil implements Opcodes {
 
             ConfirmDialogInstantiator.init();
 
-            Class<?> commandTabClass = result[i++];
+            commandTabClass = result[i++];
+            intelTabClass = result[i++];
 
             for (Object field : commandTabClass.getDeclaredFields()) {
                 if (Refl.getFieldType(field) == IntelIncomePanel.class) {

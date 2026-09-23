@@ -56,6 +56,9 @@ import data.scripts.autopilotwithgates.util.TreeTraverser.TreeNode;
 import data.scripts.autopilotwithgates.util.UiUtil;
 
 import static data.scripts.autopilotwithgates.AutoPilotWithGatesSettings.*;
+import static data.scripts.autopilotwithgates.util.UiUtil.commandTabClass;
+import static data.scripts.autopilotwithgates.util.UiUtil.intelTabClass;
+import static data.scripts.autopilotwithgates.util.UiUtil.mapTabClass;
 import static data.scripts.autopilotwithgates.util.UiUtil.utils;
 import static data.scripts.autopilotwithgates.AutopilotWithGatesPlugin.systemGateData;
 
@@ -197,34 +200,42 @@ public class AutoPilotListener extends BaseCampaignEventListener implements Ever
             }
 
             if (CoreUITabId.MAP == currentCoreTabId) {
-                mapsPresent = true;
-                UIPanelAPI map = utils.mapTabGetMap(utils.coreGetCurrentTab(core));
-                if (!this.maps.containsKey(map)) this.maps.add(map);
-
-            } else if (CoreUITabId.INTEL == currentCoreTabId) {
-                mapsPresent = true;
-                UIPanelAPI intelTab = utils.coreGetCurrentTab(core);
-                UIPanelAPI map = UiUtil.getMapFromIntelTab(intelTab);
-
-                if (!this.maps.containsKey(map)) this.maps.add(map);
-                
-                ButtonAPI planetsButton = utils.intelTabGetPlanetsButton(intelTab);
-                if (planetsButton != null && planetsButton.isHighlighted()) {
-                    UIPanelAPI planetsPanel = utils.intelTabGetPlanetsPanel(intelTab);
-                    UIPanelAPI planetsMap = UiUtil.getIntelTabPlanetsPanelMap(planetsPanel);
-
-                    if (planetsMap != null && !this.maps.containsKey(planetsMap)) this.maps.add(planetsMap);
-                }
-            } else if (CoreUITabId.OUTPOSTS == currentCoreTabId) {
-                UIPanelAPI commandTab = utils.coreGetCurrentTab(core);
-                ButtonAPI incomeButton = utils.commandTabGetFactionsButton(commandTab);
-                if (incomeButton != null && incomeButton.isHighlighted()) {
+                UIPanelAPI mapTab = utils.coreGetCurrentTab(core);
+                if (mapTabClass.isInstance(mapTab)) { // havent had a mismatch here like the command tab has had with cargo (see below) putting this here just in case
                     mapsPresent = true;
-                    Object intelIncomePanel = UiUtil.commandTabIntelIncomePanelHandle.get(commandTab);
-                    Object mapController = UiUtil.intelIncomePanelMapHandle.get(intelIncomePanel);
-                    UIPanelAPI map = utils.mapTabGetMap(mapController);
+                    UIPanelAPI map = utils.mapTabGetMap(mapTab);
+                    if (!this.maps.containsKey(map)) this.maps.add(map);
+                }
+                
+            } else if (CoreUITabId.INTEL == currentCoreTabId) {
+                UIPanelAPI intelTab = utils.coreGetCurrentTab(core);
+                if (intelTabClass.isInstance(intelTab)) { // havent had a mismatch here like the command tab has had with cargo (see below) putting this here just in case
+                    mapsPresent = true;
+                    UIPanelAPI map = UiUtil.getMapFromIntelTab(intelTab);
 
                     if (!this.maps.containsKey(map)) this.maps.add(map);
+                    
+                    ButtonAPI planetsButton = utils.intelTabGetPlanetsButton(intelTab);
+                    if (planetsButton != null && planetsButton.isHighlighted()) {
+                        UIPanelAPI planetsPanel = utils.intelTabGetPlanetsPanel(intelTab);
+                        UIPanelAPI planetsMap = UiUtil.getIntelTabPlanetsPanelMap(planetsPanel);
+
+                        if (planetsMap != null && !this.maps.containsKey(planetsMap)) this.maps.add(planetsMap);
+                    }
+                }
+
+            } else if (CoreUITabId.OUTPOSTS == currentCoreTabId) {
+                UIPanelAPI commandTab = utils.coreGetCurrentTab(core);
+                if (commandTabClass.isInstance(commandTab)) { // idk why it would be anything else here but apparently it can be.
+                    ButtonAPI incomeButton = utils.commandTabGetFactionsButton(commandTab);
+                    if (incomeButton != null && incomeButton.isHighlighted()) {
+                        mapsPresent = true;
+                        Object intelIncomePanel = UiUtil.commandTabIntelIncomePanelHandle.get(commandTab);
+                        Object mapController = UiUtil.intelIncomePanelMapHandle.get(intelIncomePanel);
+                        UIPanelAPI map = utils.mapTabGetMap(mapController);
+
+                        if (!this.maps.containsKey(map)) this.maps.add(map);
+                    }
                 }
             }
 
