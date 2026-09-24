@@ -63,3 +63,12 @@ Version 0.1.4
 
 - Reworked gate blacklist dialog. Gates in systems not shown on the hyperspace map can now be picked via a different sub-dialog
 - Fixed regression crash on At the gates quest completion
+
+Version 0.1.4a
+
+- Improved gate blacklist hidden systems sub-dialog fidelity with dynamic sector map
+- Hardened version/plaform compatibility in the case of fast rendering/mikohime 27/28 java agents enabled
+
+Version 0.1.4b
+
+- Fixed crash relating to core ui tab/id mismatch
